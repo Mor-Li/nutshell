@@ -1,0 +1,13 @@
+# Swift / SPM 构建产物
+.build/
+build/
+
+# macOS
+.DS_Store
+
+# Xcode
+*.xcuserdatad
+xcuserdata/
+
+# 本机的 Claude Code 权限配置，带本地路径，不进仓库
+.claude/

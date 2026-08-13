@@ -1,0 +1,256 @@
+<!doctype html>
+<meta charset="utf-8">
+<style>
+  :root {
+    /* 背景交给底下的 NSVisualEffectView（毛玻璃）画，这里保持透明 */
+    --bg: transparent;
+    --fg: #1d1d1f;
+    --muted: #86868b;
+    --rule: rgba(0, 0, 0, 0.09);
+    --code-bg: rgba(0, 0, 0, 0.045);
+    --quote-bar: rgba(0, 0, 0, 0.16);
+    --link: #0066cc;
+    --danger: #c1121f;
+    --danger-bg: rgba(193, 18, 31, 0.07);
+    --font-size: 14.5px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --fg: #e8e8ed;
+      --muted: #8e8e93;
+      --rule: rgba(255, 255, 255, 0.12);
+      --code-bg: rgba(255, 255, 255, 0.07);
+      --quote-bar: rgba(255, 255, 255, 0.22);
+      --link: #6cb4ff;
+      --danger: #ff6b6b;
+      --danger-bg: rgba(255, 107, 107, 0.1);
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: var(--bg);
+    color: var(--fg);
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif;
+    font-size: var(--font-size);
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* 整个页面就是滚动容器 */
+  #scroll {
+    height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 14px 16px 20px;
+  }
+  #scroll::-webkit-scrollbar { width: 9px; }
+  #scroll::-webkit-scrollbar-thumb {
+    background: var(--quote-bar);
+    border-radius: 5px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  #scroll::-webkit-scrollbar-track { background: transparent; }
+
+  /* ── 思考中 ── */
+  #thinking {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    color: var(--muted);
+    padding: 6px 2px;
+  }
+  body.state-thinking #thinking { display: flex; }
+
+  .dots { display: inline-flex; gap: 4px; }
+  .dots i {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--muted);
+    animation: bounce 1.25s infinite ease-in-out;
+  }
+  .dots i:nth-child(2) { animation-delay: .16s; }
+  .dots i:nth-child(3) { animation-delay: .32s; }
+  @keyframes bounce {
+    0%, 70%, 100% { opacity: .28; transform: translateY(0); }
+    35%           { opacity: 1;   transform: translateY(-3px); }
+  }
+
+  /* 流式输出时，末尾跟一个闪烁光标 */
+  body.state-streaming #md > :last-child::after {
+    content: "";
+    display: inline-block;
+    width: 2px; height: 1.05em;
+    margin-left: 2px;
+    vertical-align: -0.16em;
+    background: var(--fg);
+    opacity: .55;
+    animation: blink 1.1s steps(1) infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* ── markdown 排版 ── */
+  #md > :first-child { margin-top: 0; }
+  #md > :last-child  { margin-bottom: 0; }
+
+  h1, h2, h3, h4 { line-height: 1.35; margin: 1.15em 0 .5em; font-weight: 650; }
+  h1 { font-size: 1.32em; }
+  h2 { font-size: 1.18em; }
+  h3 { font-size: 1.06em; }
+  h4 { font-size: 1em; }
+
+  p { margin: .62em 0; }
+  ul, ol { margin: .62em 0; padding-left: 1.45em; }
+  li { margin: .26em 0; }
+  li > ul, li > ol { margin: .26em 0; }
+
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  strong { font-weight: 640; }
+
+  code {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: .89em;
+    background: var(--code-bg);
+    padding: .14em .38em;
+    border-radius: 4px;
+  }
+  pre {
+    background: var(--code-bg);
+    border-radius: 8px;
+    padding: 10px 12px;
+    overflow-x: auto;
+    margin: .7em 0;
+  }
+  pre code { background: none; padding: 0; font-size: .87em; line-height: 1.5; }
+
+  blockquote {
+    margin: .7em 0;
+    padding: .1em 0 .1em .85em;
+    border-left: 3px solid var(--quote-bar);
+    color: var(--muted);
+  }
+
+  hr { border: 0; border-top: 1px solid var(--rule); margin: 1.1em 0; }
+
+  /* 表格可能很宽，让它自己横向滚，别把整页撑开 */
+  .table-wrap { overflow-x: auto; margin: .7em 0; }
+  table { border-collapse: collapse; font-size: .93em; }
+  th, td { border: 1px solid var(--rule); padding: 5px 9px; text-align: left; }
+  th { background: var(--code-bg); font-weight: 620; }
+
+  img { max-width: 100%; border-radius: 6px; }
+
+  /* ── 出错 ── */
+  #error {
+    display: none;
+    white-space: pre-wrap;
+    color: var(--danger);
+    background: var(--danger-bg);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: .95em;
+  }
+  body.state-error #error { display: block; }
+  body.state-error #md, body.state-error #thinking { display: none; }
+</style>
+
+<div id="scroll">
+  <div id="thinking"><span class="dots"><i></i><i></i><i></i></span><span id="thinking-label">正在琢磨…</span></div>
+  <div id="error"></div>
+  <div id="md"></div>
+</div>
+
+<script>/*__MARKED_JS__*/</script>
+
+<script>
+(function () {
+  const scroll = document.getElementById('scroll');
+  const mdEl = document.getElementById('md');
+  const errEl = document.getElementById('error');
+  const thinkingLabel = document.getElementById('thinking-label');
+
+  marked.setOptions({ breaks: true, gfm: true });
+
+  // 只要用户自己往上滚过，就别再抢着把他拽回底部
+  let stickToBottom = true;
+  scroll.addEventListener('scroll', () => {
+    stickToBottom = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 36;
+  });
+
+  // 模型输出的 HTML 直接渲染是有风险的，这里把能执行脚本的东西剔掉
+  function sanitize(root) {
+    root.querySelectorAll('script, iframe, object, embed, form, link, meta').forEach(n => n.remove());
+    root.querySelectorAll('*').forEach(el => {
+      [...el.attributes].forEach(attr => {
+        const name = attr.name.toLowerCase();
+        const value = attr.value.trim().toLowerCase();
+        if (name.startsWith('on')) el.removeAttribute(attr.name);
+        if ((name === 'href' || name === 'src') && value.startsWith('javascript:')) {
+          el.removeAttribute(attr.name);
+        }
+      });
+    });
+    // 宽表格套一层横向滚动容器
+    root.querySelectorAll('table').forEach(t => {
+      if (t.parentElement && t.parentElement.classList.contains('table-wrap')) return;
+      const wrap = document.createElement('div');
+      wrap.className = 'table-wrap';
+      t.replaceWith(wrap);
+      wrap.appendChild(t);
+    });
+  }
+
+  window.nsRender = function (text) {
+    mdEl.innerHTML = marked.parse(text || '');
+    sanitize(mdEl);
+    if (stickToBottom) scroll.scrollTop = scroll.scrollHeight;
+  };
+
+  window.nsState = function (state, label) {
+    document.body.className = 'state-' + state;
+    if (label) thinkingLabel.textContent = label;
+    if (state === 'thinking') {
+      mdEl.innerHTML = '';
+      errEl.textContent = '';
+      stickToBottom = true;
+      scroll.scrollTop = 0;
+    }
+  };
+
+  // 切回一段旧对话：一次性铺满，停在最后一句上（跟当时聊完的样子一致），
+  // 同时把"跟着滚"打开，这样接着追问时新字还是会自动跟进来
+  window.nsRestore = function (text) {
+    document.body.className = 'state-done';
+    errEl.textContent = '';
+    mdEl.innerHTML = marked.parse(text || '');
+    sanitize(mdEl);
+    stickToBottom = true;
+    scroll.scrollTop = scroll.scrollHeight;
+  };
+
+  window.nsError = function (message) {
+    errEl.textContent = message || '出错了';
+    document.body.className = 'state-error';
+  };
+
+  window.nsFontSize = function (px) {
+    document.documentElement.style.setProperty('--font-size', px + 'px');
+  };
+
+  // 链接一律交给系统浏览器开，别在这个小浮窗里跳转
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest('a');
+    if (a && a.href) { e.preventDefault(); window.location.href = 'nutshell-open:' + a.href; }
+  });
+
+  window.nsState('thinking');
+})();
+</script>
