@@ -214,8 +214,13 @@ Sources/Nutshell/
   LLMClient.swift       调网关，SSE 流式收字
   PopoverPanel.swift    浮窗本体 + 自适应定位 + 追问输入框
   MarkdownView.swift    WKWebView 壳，负责渲染
+  SessionStore.swift    对话历史落盘（一次对话一个 JSON，只增不删）
   Config.swift          配置读写（prompt 常量在文件顶部）
   Resources/
     viewer.html         渲染页（样式、思考动画、自动滚动）
     marked.min.js       markdown 解析库，内嵌进 app，不联网
 ```
+
+## License
+
+MIT，随便用。
