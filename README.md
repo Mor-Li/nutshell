@@ -169,6 +169,9 @@ pkill -x Nutshell                       # 退出
 | `maxScannedPDFPages` | 扫描版 PDF 最多看前几页 |
 | `showMenuBarIcon` | 默认 `false`。改成 `true` 会在菜单栏放个气泡图标，里面有打开配置/重载/退出 |
 | `systemPrompt` | 系统提示词，默认空 |
+| `historyMenuCount` | 历史菜单里列几条，默认 30（磁盘上的对话一条都不会删） |
+| `rateLimitRetries` | 撞 429 自动重试几次，默认 6；填 0 就是不重试直接报错 |
+| `rateLimitRetryDelay` | 两次重试之间等几秒，默认 2 |
 
 API key 可以不写进配置文件：程序会 `source ~/.zshrc` 去读 `$OPENAI_API_KEY`（变量名按 `apiKeyEnvVar` 改），key 换了也能自动跟上（撞 401 会自动重读一次）。想写死也行，填 `apiKey` 字段。
 
@@ -202,6 +205,13 @@ source ~/.zshrc && echo ${OPENAI_API_KEY: -4}
 ```
 
 有值就正常。没值说明 key 没配好，或者不在 `~/.zshrc` 这条链路上。
+
+**撞 429 被限流**：不用管，它自己会重试——每 2 秒一次，最多 6 次，窗里会显示第几次。
+
+429 常见的那句 `Limit type: max_parallel_requests. Current limit: 2` 说的不是「你按太快了」，
+而是**这个 key 同一时刻能跑几个请求**已经占满了——多半是你在别处跑着批量任务，
+或者这个 key 是跟别人共用的。这种水位几秒就松，所以等着就行。
+真要等不及，改 `rateLimitRetries` 和 `rateLimitRetryDelay`。
 
 ## 目录
 

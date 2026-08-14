@@ -23,7 +23,11 @@ actor LLMClient {
 
     struct Failure: LocalizedError {
         let message: String
+        /// HTTP 层的错误码。429 会被自动重试，别的直接报出去。
+        var status: Int?
         var errorDescription: String? { message }
+
+        var isRateLimited: Bool { status == 429 }
     }
 
     private var task: Task<Void, Never>?
@@ -36,24 +40,45 @@ actor LLMClient {
 
     /// - Parameters:
     ///   - onDelta: 每收到一小段文字回调一次（已经在主线程）
+    ///   - onRetry: 撞 429 要等一会儿重来时叫一声（第几次 / 一共几次），让界面能给点交代
     ///   - onFinish: 结束回调，error 为 nil 表示正常收完
     func stream(
         messages: [ChatMessage],
         config: Config,
         apiKey: String,
         onDelta: @escaping @MainActor (String) -> Void,
+        onRetry: @escaping @MainActor (Int, Int) -> Void = { _, _ in },
         onFinish: @escaping @MainActor (Error?) -> Void
     ) {
         cancel()
+        let budget = max(0, config.rateLimitRetries)
+
         task = Task {
-            do {
-                try await run(messages: messages, config: config, apiKey: apiKey, onDelta: onDelta)
-                await MainActor.run { onFinish(nil) }
-            } catch is CancellationError {
-                // 用户主动取消，不算错误，什么都不做
-            } catch {
-                if Task.isCancelled { return }
-                await MainActor.run { onFinish(error) }
+            var attempt = 0
+            while true {
+                do {
+                    try await run(messages: messages, config: config, apiKey: apiKey, onDelta: onDelta)
+                    await MainActor.run { onFinish(nil) }
+                    return
+                } catch is CancellationError {
+                    // 用户主动取消，不算错误，什么都不做
+                    return
+                } catch let failure as Failure where failure.isRateLimited && attempt < budget {
+                    // 限流是"位子暂时占满了"，不是"这次请求有问题"——等一下再挤一次。
+                    // 429 是在响应头就被拦下的，一个字都还没吐出来，所以整轮重发不会重复内容。
+                    attempt += 1
+                    let round = attempt
+                    await MainActor.run { onRetry(round, budget) }
+                    do {
+                        try await Task.sleep(for: .seconds(config.rateLimitRetryDelay))
+                    } catch {
+                        return   // 等的过程中被取消了
+                    }
+                } catch {
+                    if Task.isCancelled { return }
+                    await MainActor.run { onFinish(error) }
+                    return
+                }
             }
         }
     }
@@ -120,7 +145,8 @@ actor LLMClient {
             var raw = ""
             for try await line in bytes.lines { raw += line }
             throw Failure(message: describe(status: http.statusCode, body: raw,
-                                            envVar: config.apiKeyEnvVar))
+                                            envVar: config.apiKeyEnvVar),
+                          status: http.statusCode)
         }
 
         var sawAnyContent = false
@@ -138,7 +164,10 @@ actor LLMClient {
             // 网关有时把错误也塞在 SSE 流里
             if let err = json["error"] as? [String: Any] {
                 let msg = (err["message"] as? String) ?? "未知错误"
-                throw Failure(message: msg)
+                // code 有的网关给数字有的给字符串，都认一下
+                let code = (err["code"] as? Int) ?? (err["code"] as? String).flatMap(Int.init)
+                // 已经吐过字了就不标成可重试——重发会把前面那半截再说一遍
+                throw Failure(message: redact(msg), status: sawAnyContent ? nil : code)
             }
 
             guard let choices = json["choices"] as? [[String: Any]],
@@ -159,14 +188,25 @@ actor LLMClient {
 
     /// - Parameter envVar: 报错时把用户自己配的那个变量名写进去，
     ///   别让人对着一个跟自己配置对不上的名字排查
+    /// 报文里常带着 key 的指纹（一长串十六进制）。摆在浮窗上既没用又扎眼，打掉。
+    private func redact(_ text: String) -> String {
+        text.replacingOccurrences(
+            of: #"(api[_-]?key["'\s:=]+)[A-Za-z0-9]{16,}"#,
+            with: "$1<…>",
+            options: [.regularExpression, .caseInsensitive]
+        )
+    }
+
     private func describe(status: Int, body: String, envVar: String) -> String {
-        let snippet = body.count > 500 ? String(body.prefix(500)) + "…" : body
+        let clean = redact(body)
+        let snippet = clean.count > 500 ? String(clean.prefix(500)) + "…" : clean
         switch status {
         case 401:
             return "401 认证失败——API key 不对或者已作废。\n"
                  + "先在终端跑 `source ~/.zshrc && echo ${\(envVar): -4}` 对一下 key 的尾号。\n\n\(snippet)"
         case 429:
-            return "429 被限流了，等几秒再按一次。\n\n\(snippet)"
+            return "被限流了（429），自动重试了几轮还是没挤进去。\n"
+                 + "一般是同一个 key 上有别的任务在跑，把并发的位子占满了——歇一会儿再按一次。\n\n\(snippet)"
         case 404:
             return "404 找不到这个模型：\(snippet)\n模型名可能拼错了，或者没在网关白名单里。"
         default:
