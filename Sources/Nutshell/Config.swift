@@ -43,6 +43,15 @@ struct Config: Codable {
     var maxTokens: Int = 32768
     var temperature: Double = 0.6
 
+    /// 撞 429（被限流）时自己重试几次，0 = 不重试直接报错。
+    ///
+    /// 429 多半不是"你发太快了"，而是这个 key 上同时在跑的请求占满了位子
+    /// （共享的 key 尤其常见）——那是个几秒就松的瞬时水位，等一下再挤基本都能进去，
+    /// 犯不着让人对着红字自己再按一次。
+    var rateLimitRetries: Int = 6
+    /// 两次重试之间等几秒
+    var rateLimitRetryDelay: Double = 2
+
     /// BTT 用 curl 打这个端口来触发。挑了个冷门号，免得跟别的本地服务撞车。
     var port: UInt16 = 8823
 
@@ -100,6 +109,8 @@ extension Config {
         apiKeyEnvVar        = read(.apiKeyEnvVar, fallback.apiKeyEnvVar)
         maxTokens           = read(.maxTokens, fallback.maxTokens)
         temperature         = read(.temperature, fallback.temperature)
+        rateLimitRetries    = read(.rateLimitRetries, fallback.rateLimitRetries)
+        rateLimitRetryDelay = read(.rateLimitRetryDelay, fallback.rateLimitRetryDelay)
         port                = read(.port, fallback.port)
         promptTemplate      = read(.promptTemplate, fallback.promptTemplate)
         imagePromptTemplate = read(.imagePromptTemplate, fallback.imagePromptTemplate)

@@ -265,6 +265,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     self.accumulated += piece
                     self.panel?.markdownView.update(markdown: settled + self.accumulated)
                 },
+                onRetry: { [weak self] round, total in
+                    guard let self else { return }
+                    let seconds = String(format: "%g", config.rateLimitRetryDelay)
+                    let note = "⏳ 被限流了，\(seconds) 秒后自动重试（第 \(round)/\(total) 次）…"
+                    if settled.isEmpty {
+                        self.panel?.markdownView.beginThinking(label: note)
+                    } else {
+                        // 前面几轮问答还在窗里摆着，别拿"正在琢磨"把它们盖掉
+                        self.panel?.markdownView.update(markdown: settled + "\n\n" + note)
+                    }
+                },
                 onFinish: { [weak self] error in
                     guard let self else { return }
                     self.panel?.setInputEnabled(true)
