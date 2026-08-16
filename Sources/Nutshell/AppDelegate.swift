@@ -26,6 +26,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         config = ConfigStore.load()
 
+        buildEditMenu()
         buildStatusItem()
         startServer()
         ConfigStore.warmUpAPIKey(config)   // 提前去 shell 里把 key 捞好
@@ -33,6 +34,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         server?.stop()
+    }
+
+    // MARK: - 隐形的编辑菜单
+
+    /// 装一个只有「编辑」一项的主菜单。
+    ///
+    /// macOS 有条不太直觉的规矩：`Cmd+C`、`Cmd+V` 这些键**不是输入框自己处理的**，
+    /// 而是系统拿着按键去主菜单里找"谁绑了这个快捷键"，找到了才把 copy:／paste:
+    /// 发给光标所在的控件。这程序不进 Dock、不占菜单栏，压根没建过主菜单，
+    /// 于是这些键一按就石沉大海——普通字打得进去（那是输入框自己收的），
+    /// 一碰 Cmd 组合键就没反应。
+    ///
+    /// 挂上这个菜单就通了。程序是 accessory 类型，这个菜单栏不会显示出来，
+    /// 纯粹是给系统查快捷键用的。
+    private func buildEditMenu() {
+        let edit = NSMenu(title: "编辑")
+        // undo:／redo: 在 Swift 里没有对应的方法声明可以指，只能写字符串
+        edit.addItem(withTitle: "撤销", action: Selector(("undo:")), keyEquivalent: "z")
+        edit.addItem(withTitle: "重做", action: Selector(("redo:")), keyEquivalent: "Z")
+        edit.addItem(.separator())
+        edit.addItem(withTitle: "剪切", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        edit.addItem(withTitle: "拷贝", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        edit.addItem(withTitle: "粘贴", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        edit.addItem(withTitle: "粘贴为纯文本",
+                     action: #selector(NSTextView.pasteAsPlainText(_:)), keyEquivalent: "V")
+        edit.addItem(.separator())
+        edit.addItem(withTitle: "全选", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+
+        let editItem = NSMenuItem()
+        editItem.submenu = edit
+
+        let main = NSMenu()
+        main.addItem(editItem)
+        NSApp.mainMenu = main
     }
 
     // MARK: - 菜单栏

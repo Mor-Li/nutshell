@@ -136,9 +136,20 @@ final class PopoverPanel: NSPanel {
         inputField.placeholderString = enabled ? "接着问点什么…（回车发送）" : "正在回答…"
     }
 
-    /// 点浮窗任意位置就把光标送进输入框——省得你还得瞄准那一条细缝去点
+    /// 点浮窗任意位置就把光标送进输入框——省得你还得瞄准那一条细缝去点。
+    ///
+    /// 但鼠标正落在正文上时不抢：那多半是要划字拷贝，
+    /// 光标被抢到输入框的话，Cmd+C 拷到的就是输入框里的空气了。
     override func becomeKey() {
         super.becomeKey()
+
+        guard let markdownView, let contentView else {
+            makeFirstResponder(inputField)
+            return
+        }
+        let point = contentView.convert(mouseLocationOutsideOfEventStream, from: nil)
+        guard !markdownView.frame.contains(point) else { return }
+
         makeFirstResponder(inputField)
     }
 
