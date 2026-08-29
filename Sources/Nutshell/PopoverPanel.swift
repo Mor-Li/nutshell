@@ -12,6 +12,9 @@ final class PopoverPanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
 
+    /// 露脸期间借走 ⌘W 的全局热键，见 CloseHotKey 的说明
+    private let closeHotKey = CloseHotKey()
+
     private let header = NSView()
     private var historyButton: NSButton!
     private let modelLabel = NSTextField(labelWithString: "")
@@ -74,7 +77,7 @@ final class PopoverPanel: NSPanel {
         header.addSubview(modelLabel)
 
         let copyButton = makeButton(symbol: "doc.on.doc", tooltip: "复制全文", action: #selector(copyTapped))
-        let closeButton = makeButton(symbol: "xmark", tooltip: "关闭 (Esc)", action: #selector(closeTapped))
+        let closeButton = makeButton(symbol: "xmark", tooltip: "关闭 (⌘W / Esc)", action: #selector(closeTapped))
 
         let buttons = NSStackView(views: [copyButton, closeButton])
         buttons.spacing = 2
@@ -202,8 +205,15 @@ final class PopoverPanel: NSPanel {
         onHistory?(historyButton)
     }
 
-    /// Esc 关窗（面板是 key 的时候走这条；不是 key 的时候由全局监听兜底）
+    /// Esc 关窗。只在面板是 key（点过浮窗）时收得到；
+    /// 没点过的话请按 ⌘W——那个是全局热键，浮窗露着脸就管用。
+    /// Esc 故意不做成全局的：vim、全屏视频这些地方 Esc 各有各的用处，抢了要出人命。
     override func cancelOperation(_ sender: Any?) { onClose?() }
+
+    /// 主菜单「关闭窗口 ⌘W」顺着 responder 链走到这儿。
+    /// 平时轮不到它（全局热键在系统层就把 ⌘W 截了）；
+    /// 万一热键没注册上，点过浮窗之后按 ⌘W 还有这条路兜着。
+    override func performClose(_ sender: Any?) { onClose?() }
 
     // MARK: - 定位
 
@@ -244,5 +254,19 @@ final class PopoverPanel: NSPanel {
     func present(near mouse: NSPoint, gap: CGFloat) {
         setFrame(Self.frame(near: mouse, size: frame.size, gap: gap), display: true)
         orderFrontRegardless()
+        // 露脸了，⌘W 归我；关窗走 onClose，跟点 ✗ 按钮同一条路
+        closeHotKey.register { [weak self] in self?.onClose?() }
+    }
+
+    /// 平时藏窗走这条（dismiss 用的就是它），把 ⌘W 还回去
+    override func orderOut(_ sender: Any?) {
+        closeHotKey.unregister()
+        super.orderOut(sender)
+    }
+
+    /// 拆窗（重载配置时）也还。unregister 幂等，跟上面撞车了也没事
+    override func close() {
+        closeHotKey.unregister()
+        super.close()
     }
 }
