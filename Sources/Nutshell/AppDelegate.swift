@@ -36,9 +36,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         server?.stop()
     }
 
-    // MARK: - 隐形的编辑菜单
+    // MARK: - 隐形的主菜单
 
-    /// 装一个只有「编辑」一项的主菜单。
+    /// 装一个带「文件」「编辑」两项的主菜单。
     ///
     /// macOS 有条不太直觉的规矩：`Cmd+C`、`Cmd+V` 这些键**不是输入框自己处理的**，
     /// 而是系统拿着按键去主菜单里找"谁绑了这个快捷键"，找到了才把 copy:／paste:
@@ -65,7 +65,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let editItem = NSMenuItem()
         editItem.submenu = edit
 
+        // 「关闭窗口 ⌘W」备胎：浮窗露脸时 ⌘W 走的是全局热键（见 CloseHotKey），
+        // 轮不到菜单；万一热键没注册上，点过浮窗之后按 ⌘W 由这条顺着
+        // responder 链找到 panel 的 performClose 关窗
+        let file = NSMenu(title: "文件")
+        file.addItem(withTitle: "关闭窗口",
+                     action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+        let fileItem = NSMenuItem()
+        fileItem.submenu = file
+
         let main = NSMenu()
+        main.addItem(fileItem)
         main.addItem(editItem)
         NSApp.mainMenu = main
     }
