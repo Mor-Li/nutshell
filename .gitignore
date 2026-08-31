@@ -11,3 +11,12 @@ xcuserdata/
 
 # 本机的 Claude Code 权限配置，带本地路径，不进仓库
 .claude/
+
+# scripts/explain_repo.py 的产物与缓存：
+# 逐文件解读是同级同名 md（AppDelegate.swift → AppDelegate.md），目录总览叫
+# EXPLAIN.md，全是生成物、只给人本地翻阅，不进仓库。README.md / CLAUDE.md
+# 是人写的（CLAUDE.md 里只有地图那一段归脚本管），显式放行。
+*.md
+!README.md
+!CLAUDE.md
+.explain-cache/
