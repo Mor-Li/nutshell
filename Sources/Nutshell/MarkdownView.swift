@@ -46,10 +46,17 @@ final class MarkdownView: NSView {
 
     /// 开始新一轮：清空内容，显示"正在琢磨…"
     func beginThinking(label: String) {
+        beginRound(markdown: "", label: label)
+    }
+
+    /// 刚发出一问：把已有内容（含刚问的那个气泡）铺上去，
+    /// 在底下显示"正在琢磨"的小点，等第一个字回来。
+    func beginRound(markdown: String, label: String) {
         flushTimer?.invalidate()
-        latestMarkdown = ""
+        flushTimer = nil
+        latestMarkdown = markdown
         lastFlush = .distantPast
-        run("window.nsState('thinking', \(Self.jsString(label)))")
+        run("window.nsRender(\(Self.jsString(markdown))); window.nsState('thinking', \(Self.jsString(label)))")
     }
 
     /// 收到新内容（传全量文本，页面负责整体重渲染——比增量拼 DOM 可靠得多）

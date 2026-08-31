@@ -5,21 +5,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var config = Config()
     private var statusItem: NSStatusItem!
-    private var panel: PopoverPanel?
     private var server: TriggerServer?
-    private let llm = LLMClient()
 
-    /// 发给模型的完整对话历史（含剪贴板那段开场白）
-    private var conversation: [ChatMessage] = []
-    /// 浮窗里已经定稿的内容（前几轮问答）
-    private var transcript = ""
-    /// 这一轮正在往外蹦的字
-    private var accumulated = ""
+    /// 屏幕上开着的浮窗们，谁后弹的谁排在尾巴上。
+    /// 每扇窗自带一段对话和一条 LLM 通道（见 ExplainWindowController），
+    /// 这里只负责开新窗、记名册、销名册。
+    private var windows: [ExplainWindowController] = []
 
-    /// 手上这段对话在历史里的身份证。答完一轮就按这个 id 覆盖存一次盘。
-    private var currentSessionID: String?
-    private var currentTitle = ""
-    private var currentCreatedAt = Date()
+    /// ⌘W 全局热键。只要还有浮窗在册就借着，最后一扇关掉立刻归还。
+    /// 收归到这儿统一管，是因为多扇窗各自去注册同一个 ⌘W 的话，
+    /// 一次按键会把所有窗的回调全敲响——按一下全关光，那就闹笑话了。
+    private let closeHotKey = CloseHotKey()
 
     // MARK: - 生命周期
 
@@ -65,9 +61,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let editItem = NSMenuItem()
         editItem.submenu = edit
 
-        // 「关闭窗口 ⌘W」备胎：浮窗露脸时 ⌘W 走的是全局热键（见 CloseHotKey），
+        // 「关闭窗口 ⌘W」备胎：浮窗露脸时 ⌘W 走的是全局热键（closeHotKey），
         // 轮不到菜单；万一热键没注册上，点过浮窗之后按 ⌘W 由这条顺着
-        // responder 链找到 panel 的 performClose 关窗
+        // responder 链找到那扇窗的 performClose 关窗
         let file = NSMenu(title: "文件")
         file.addItem(withTitle: "关闭窗口",
                      action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
@@ -141,10 +137,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             didReportServerFailure = false
             startServer()
         }
-        // 字号之类的改动，下次开窗生效最省事。窗要拆了，手上这段先存进历史
-        stashCurrentSession()
-        panel?.close()
-        panel = nil
+        // 字号之类的改动，下次开窗生效最省事。窗全拆了，每扇手上那段各自存进历史。
+        // close 会回调 onClosed 改 windows 数组，for-in 遍历的是进循环时的那份快照，不冲突
+        for controller in windows { controller.close() }
 
         buildStatusItem()
         if !silent { notify("配置已重新加载", "模型：\(config.model)") }
@@ -208,227 +203,82 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - 主流程
 
-    /// 按一下快捷键会走到这儿。开着就关掉，关着就干活——就是个开关。
-    private func handleTrigger() {
-        if let panel, panel.isVisible {
-            dismiss()
-            return
-        }
-
-        // 先把窗开出来显示"正在琢磨"，别让人以为按了没反应
-        let mouse = NSEvent.mouseLocation
-        let panel = ensurePanel()
-        accumulated = ""
-        panel.markdownView.beginThinking(label: "正在读剪贴板…")
-        panel.present(near: mouse, gap: config.window.gap)
-
-        // 让窗口先画出来，再去干读剪贴板和发请求的活
-        DispatchQueue.main.async { [weak self] in
-            self?.captureAndAsk()
-        }
-    }
-
-    /// 开一轮新的：读剪贴板，作为对话的第一条消息发出去
-    private func captureAndAsk() {
-        guard let panel else { return }
-
-        let input: CapturedInput
-        do {
-            input = try InputCapture.capture(config: config)
-        } catch {
-            panel.markdownView.showError(error.localizedDescription)
-            return
-        }
-
-        // 把剪贴板内容套进 prompt 模板，这就是对话的开场白
-        let opening: ChatMessage.Content
-        switch input {
-        case .text(let body):
-            opening = .text(config.promptTemplate.replacingOccurrences(of: "{content}", with: body))
-            panel.markdownView.beginThinking(label: "\(config.model) 正在琢磨…")
-
-        case .images(let images, let note):
-            var instruction = config.imagePromptTemplate
-            if let note, !note.isEmpty { instruction += "\n\n补充信息：\n\(note)" }
-            opening = .multimodal(text: instruction, images: images)
-            panel.markdownView.beginThinking(label: "正在看图（\(images.count) 张）…")
-        }
-
-        conversation = [.user(opening)]
-        transcript = ""
-
-        // 新的一段对话，发一张新身份证；标题取剪贴板开头那几个字，历史菜单里认得出
-        currentSessionID = SessionStore.newID()
-        currentTitle = SessionStore.makeTitle(from: input)
-        currentCreatedAt = Date()
-
-        send(retryOnAuthFailure: true)
-    }
-
-    /// 追问：把新问题接到对话后面再发一次
-    private func askFollowUp(_ question: String) {
-        guard let panel, !conversation.isEmpty else { return }
-
-        conversation.append(.user(.text(question)))
-
-        // 把问题也显示出来，不然滚上去看只有一堆回答，不知道在答什么
-        transcript += "\n\n---\n\n> **你问：** \(question)\n\n"
-        panel.markdownView.update(markdown: transcript)
-        send(retryOnAuthFailure: true)
-    }
-
-    /// - Parameter retryOnAuthFailure: 撞 401 时重新去 shell 捞一次 key 再试。
-    ///   key 轮换后旧的会失效，缓存里那个就是废的——不重捞会一直 401。
-    private func send(retryOnAuthFailure: Bool) {
-        guard let panel else { return }
-
-        guard let apiKey = ConfigStore.resolveAPIKey(config, forceRefresh: !retryOnAuthFailure) else {
-            panel.markdownView.showError(
-                """
-                没找到 API key。
-
-                两个办法二选一：
-                1. 在终端确认 `echo $\(config.apiKeyEnvVar)` 有值（Nutshell 会 source 你的 ~/.zshrc 去读）
-                2. 直接把 key 写进 ~/.config/nutshell/config.json 的 apiKey 字段
-                """
-            )
-            return
-        }
-
-        // transcript 是已经定稿的部分，accumulated 是这一轮正在往外蹦的字
-        let settled = transcript
-        accumulated = ""
-        panel.setInputEnabled(false)
-
-        Task { [config, llm, conversation] in
-            await llm.stream(
-                messages: conversation,
-                config: config,
-                apiKey: apiKey,
-                onDelta: { [weak self] piece in
-                    guard let self else { return }
-                    self.accumulated += piece
-                    self.panel?.markdownView.update(markdown: settled + self.accumulated)
-                },
-                onRetry: { [weak self] round, total in
-                    guard let self else { return }
-                    let seconds = String(format: "%g", config.rateLimitRetryDelay)
-                    let note = "⏳ 被限流了，\(seconds) 秒后自动重试（第 \(round)/\(total) 次）…"
-                    if settled.isEmpty {
-                        self.panel?.markdownView.beginThinking(label: note)
-                    } else {
-                        // 前面几轮问答还在窗里摆着，别拿"正在琢磨"把它们盖掉
-                        self.panel?.markdownView.update(markdown: settled + "\n\n" + note)
-                    }
-                },
-                onFinish: { [weak self] error in
-                    guard let self else { return }
-                    self.panel?.setInputEnabled(true)
-
-                    guard let error else {
-                        self.settleRound(settled: settled)
-                        self.panel?.markdownView.finish()
-                        self.persistCurrentSession()
-                        return
-                    }
-
-                    // 一个字都没吐就 401 → key 多半换过了，重捞一次再试
-                    if retryOnAuthFailure,
-                       self.accumulated.isEmpty,
-                       error.localizedDescription.contains("401") {
-                        self.panel?.markdownView.beginThinking(label: "key 像是过期了，重新读一次…")
-                        self.send(retryOnAuthFailure: false)
-                        return
-                    }
-
-                    // 已经吐了一半才出错的话，别把已有内容擦掉
-                    if self.accumulated.isEmpty && settled.isEmpty {
-                        self.panel?.markdownView.showError(error.localizedDescription)
-                    } else {
-                        self.accumulated += "\n\n⚠️ 中断了：\(error.localizedDescription)"
-                        self.settleRound(settled: settled)
-                        self.panel?.markdownView.update(markdown: self.transcript)
-                        self.panel?.markdownView.finish()
-                        self.persistCurrentSession()
-                    }
-                }
-            )
-        }
-    }
-
-    /// 一轮答完（或者中途断了）的收尾：把这轮蹦出来的字挪进定稿区，
-    /// 同时补进发给模型的历史里——不然下次追问，模型不记得自己刚说过什么。
+    /// 按一下快捷键就弹一扇**新**窗，解读此刻剪贴板里的东西。
     ///
-    /// 收完 `accumulated` 一定是空的，所以"这轮的回答"只会有一个落脚点，
-    /// 存盘时不用再去猜它到底在哪边。
-    private func settleRound(settled: String) {
-        transcript = settled + accumulated
-        guard !accumulated.isEmpty else { return }
-        conversation.append(.assistant(accumulated))
-        accumulated = ""
+    /// 以前这里是个开关（开着就关、关着就开）；现在窗口可以同时开好几扇——
+    /// 选中一段、按一下，再选中另一段、再按一下，两份解读并排摆着对照看。
+    /// 关窗不再占用触发键，交给每扇窗自己的 ✗ / Esc / ⌘W。
+    private func handleTrigger() {
+        let mouse = NSEvent.mouseLocation
+        let controller = spawnWindow()
+        controller.beginFromClipboard(frame: placementFrame(near: mouse))
     }
 
-    private func dismiss() {
-        guard let panel, panel.isVisible else { return }
-        Task { await llm.cancel() }
-        // 正在往外蹦字的时候关窗，把已经蹦出来的半截也存下来，别白问
-        stashCurrentSession()
-        panel.setInputEnabled(true)
-        panel.orderOut(nil)
+    /// 造一扇新窗并记进名册。挂两条回传线：关窗除名、点小钟弹历史菜单。
+    private func spawnWindow() -> ExplainWindowController {
+        let controller = ExplainWindowController(config: config)
+        controller.onClosed = { [weak self] controller in
+            guard let self else { return }
+            self.windows.removeAll { $0 === controller }
+            self.refreshCloseHotKey()
+        }
+        controller.onHistoryMenu = { [weak self] controller, button in
+            self?.showHistoryMenu(for: controller, from: button)
+        }
+        windows.append(controller)
+        refreshCloseHotKey()
+        return controller
     }
 
-    // MARK: - 存档
-
-    /// 把手上这段对话写进历史。每答完一轮存一次，覆盖同一个文件。
-    private func persistCurrentSession() {
-        guard let id = currentSessionID, !transcript.isEmpty else { return }
-        SessionStore.save(StoredSession(
-            id: id,
-            title: currentTitle,
-            createdAt: currentCreatedAt,
-            updatedAt: Date(),
-            model: config.model,
-            transcript: transcript,
-            messages: conversation.map(StoredMessage.init)
-        ))
-    }
-
-    /// 要离开这段对话了（关窗、切到别条、开新的）：正在流的话先收尾，再存一次
-    private func stashCurrentSession() {
-        if !accumulated.isEmpty { settleRound(settled: transcript) }
-        persistCurrentSession()
-    }
-
-    // MARK: - 浮窗
-
-    private func ensurePanel() -> PopoverPanel {
-        if let panel { return panel }
-
+    /// 新窗该摆哪：先按老规矩贴着鼠标算；要是跟已有的窗几乎叠在一起
+    /// （鼠标没挪窝就又按了一下），往右下错开一步，像发牌一样摞出层次，
+    /// 底下那扇的标题栏始终露着，看得见也点得着。
+    private func placementFrame(near mouse: NSPoint) -> NSRect {
         let size = NSSize(width: config.window.width, height: config.window.height)
-        let panel = PopoverPanel(size: size)
-        let markdownView = MarkdownView(fontSize: config.window.fontSize)
+        var frame = PopoverPanel.frame(near: mouse, size: size, gap: config.window.gap)
 
-        panel.install(
-            markdownView: markdownView,
-            modelName: config.model,
-            onCopy: { [weak self] in
-                guard let self, let view = self.panel?.markdownView else { return }
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(view.currentMarkdown, forType: .string)
-            },
-            onClose: { [weak self] in self?.dismiss() },
-            onSubmit: { [weak self] question in self?.askFollowUp(question) },
-            onHistory: { [weak self] button in self?.showHistoryMenu(from: button) }
-        )
+        let taken = windows.map { $0.panel.frame }
+        var attempts = 0
+        while attempts < 12,
+              taken.contains(where: { abs($0.minX - frame.minX) < 16 && abs($0.maxY - frame.maxY) < 16 }) {
+            frame.origin.x += 28
+            frame.origin.y -= 28
+            attempts += 1
+        }
+        // 错着错着出了屏，就整个夹回来——宁可叠着也别让窗掉到屏幕外头去
+        return PopoverPanel.clamp(frame, near: mouse)
+    }
 
-        self.panel = panel
-        return panel
+    /// 有窗在册就把 ⌘W 借过来，一扇不剩立刻还回去
+    private func refreshCloseHotKey() {
+        if windows.isEmpty {
+            closeHotKey.unregister()
+        } else {
+            closeHotKey.register { [weak self] in self?.closeFrontWindow() }
+        }
+    }
+
+    /// ⌘W 关哪扇：你点过的那扇（key window）优先；都没点过就关最新弹的。
+    /// 一扇一扇按，一摞窗从上往下依次收干净。
+    private func closeFrontWindow() {
+        if let key = NSApp.keyWindow,
+           let owner = windows.first(where: { $0.panel === key }) {
+            owner.close()
+            return
+        }
+        windows.last?.close()
     }
 
     // MARK: - 历史
 
-    /// 顶栏那个小钟点开的清单。按今天／昨天／更早分堆，当前这条前面打勾。
-    private func showHistoryMenu(from button: NSButton) {
+    /// 菜单是替哪扇窗弹的。菜单是模态的，同一时刻只会开一张，存一个就够。
+    /// 挑当前条打勾、恢复历史、开新对话，都落在这扇窗上。
+    private weak var historyMenuOwner: ExplainWindowController?
+
+    /// 顶栏那个小钟点开的清单。按今天／昨天／更早分堆，这扇窗手上那条前面打勾。
+    private func showHistoryMenu(for owner: ExplainWindowController, from button: NSButton) {
+        historyMenuOwner = owner
+
         let menu = NSMenu()
         menu.addItem(actionItem("＋ 新对话（重读剪贴板）", #selector(startNewConversation)))
 
@@ -455,7 +305,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 #selector(openHistoryItem(_:))
             )
             item.representedObject = summary.id
-            item.state = summary.id == currentSessionID ? .on : .off
+            item.state = summary.id == owner.currentSessionID ? .on : .off
             // 不清掉默认的 ⌘，下面那条 Option 备选项不会生效
             item.keyEquivalentModifierMask = []
             menu.addItem(item)
@@ -480,20 +330,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.popUp(positioning: nil, at: NSPoint(x: 0, y: -4), in: button)
     }
 
-    /// 从外面直接叫出历史清单（`curl …/history`）。窗关着就先支起来——
-    /// 菜单得挂在顶栏那个小钟上，没有窗就没地方挂。
+    /// 从外面直接叫出历史清单（`curl …/history`）。
+    /// 有窗就挂在最上面那扇的小钟上；一扇都没有就先支一扇空窗——菜单得有地方挂。
     private func showHistoryFromTrigger() {
-        let panel = ensurePanel()
-        if !panel.isVisible {
-            if transcript.isEmpty {
-                panel.markdownView.restore(
-                    markdown: "从上面那个小钟里挑一段接着聊。\n\n或者复制点东西、按一下快捷键，开段新的。"
-                )
-            }
-            panel.present(near: NSEvent.mouseLocation, gap: config.window.gap)
+        let owner: ExplainWindowController
+        if let key = NSApp.keyWindow, let match = windows.first(where: { $0.panel === key }) {
+            owner = match
+        } else if let last = windows.last {
+            owner = last
+        } else {
+            owner = spawnWindow()
+            owner.showPlaceholder(frame: placementFrame(near: NSEvent.mouseLocation))
         }
         // 窗刚支起来，等这一轮布局跑完再弹，菜单才知道自己该出现在哪
-        DispatchQueue.main.async { panel.openHistoryMenu() }
+        DispatchQueue.main.async { owner.panel.openHistoryMenu() }
     }
 
     private func actionItem(_ title: String, _ action: Selector) -> NSMenuItem {
@@ -510,23 +360,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func startNewConversation() {
-        guard let panel else { return }
-        stashCurrentSession()
-        accumulated = ""
-        panel.markdownView.beginThinking(label: "正在读剪贴板…")
-        DispatchQueue.main.async { [weak self] in self?.captureAndAsk() }
+        historyMenuOwner?.restartFromClipboard()
     }
 
     @objc private func openHistoryItem(_ sender: NSMenuItem) {
         guard let id = sender.representedObject as? String else { return }
-        openSession(id)
+
+        // 这段对话已经开在别的窗里了？把那扇提到前面来就行——
+        // 同一段开两份的话，俩窗会往同一个存档文件里写，互相踩脚
+        if let existing = windows.first(where: { $0.currentSessionID == id }),
+           existing !== historyMenuOwner {
+            existing.panel.orderFrontRegardless()
+            return
+        }
+
+        guard let stored = SessionStore.load(id) else {
+            notify("这条历史打不开了", "对话文件可能被删了：\(id).json")
+            return
+        }
+        historyMenuOwner?.restore(stored)
     }
 
     @objc private func deleteHistoryItem(_ sender: NSMenuItem) {
         guard let id = sender.representedObject as? String else { return }
         SessionStore.delete(id)
-        // 删的正好是手上这条，那就当它没存过——再答一轮也不会把文件写回来
-        if currentSessionID == id { currentSessionID = nil }
+        // 删的正好是哪扇窗手上那条，那扇窗就当没存过——再答一轮也不会把文件写回来
+        for controller in windows { controller.forgetSession(id) }
     }
 
     @objc private func revealHistoryFolder() {
@@ -552,33 +411,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         SessionStore.clear()
-        currentSessionID = nil
-    }
-
-    /// 切到某段旧对话：界面复原成当时的样子，模型那边的上下文也一起接上，
-    /// 直接在底下输入框接着问就行。
-    private func openSession(_ id: String) {
-        guard let stored = SessionStore.load(id) else {
-            notify("这条历史打不开了", "对话文件可能被删了：\(id).json")
-            return
-        }
-
-        stashCurrentSession()
-        Task { await llm.cancel() }
-
-        let panel = ensurePanel()
-        conversation = stored.messages.map(\.chatMessage)
-        transcript = stored.transcript
-        accumulated = ""
-        currentSessionID = stored.id
-        currentTitle = stored.title
-        currentCreatedAt = stored.createdAt
-
-        panel.setInputEnabled(true)
-        panel.markdownView.restore(markdown: stored.transcript)
-        if !panel.isVisible {
-            panel.present(near: NSEvent.mouseLocation, gap: config.window.gap)
-        }
+        for controller in windows { controller.forgetAnySession() }
     }
 
     // MARK: - 时间怎么写
