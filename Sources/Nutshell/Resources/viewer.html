@@ -82,8 +82,39 @@
     35%           { opacity: 1;   transform: translateY(-3px); }
   }
 
+  /* ── 聊天气泡（你说的话）── */
+  .user-row { display: flex; justify-content: flex-end; margin: 4px 0 10px; }
+  .md-block + .user-row { margin-top: 16px; }  /* 上一轮的回答和下一问之间留口气 */
+  .user-bubble {
+    max-width: 84%;
+    background: #0b84ff;
+    color: #fff;
+    padding: 6px 11px;
+    border-radius: 15px;
+    border-bottom-right-radius: 5px;
+  }
+  .bubble-text {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  /* 选中的原文可能是一大段，默认只露前几行，别把回答挤出屏幕 */
+  .user-bubble.clamped .bubble-text {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 6;
+    overflow: hidden;
+  }
+  .bubble-more {
+    margin-top: 3px;
+    font-size: .85em;
+    opacity: .75;
+    cursor: pointer;
+    user-select: none;
+  }
+  .bubble-more:hover { opacity: 1; }
+
   /* 流式输出时，末尾跟一个闪烁光标 */
-  body.state-streaming #md > :last-child::after {
+  body.state-streaming #md > .md-block:last-child > :last-child::after {
     content: "";
     display: inline-block;
     width: 2px; height: 1.05em;
@@ -98,6 +129,8 @@
   /* ── markdown 排版 ── */
   #md > :first-child { margin-top: 0; }
   #md > :last-child  { margin-bottom: 0; }
+  .md-block > :first-child { margin-top: 0; }
+  .md-block > :last-child  { margin-bottom: 0; }
 
   h1, h2, h3, h4 { line-height: 1.35; margin: 1.15em 0 .5em; font-weight: 650; }
   h1 { font-size: 1.32em; }
@@ -162,10 +195,11 @@
   body.state-error #md, body.state-error #thinking { display: none; }
 </style>
 
+<!-- thinking 的小点排在 md 后面：追问时前几轮内容还在，小点跟在气泡底下才顺眼 -->
 <div id="scroll">
+  <div id="md"></div>
   <div id="thinking"><span class="dots"><i></i><i></i><i></i></span><span id="thinking-label">正在琢磨…</span></div>
   <div id="error"></div>
-  <div id="md"></div>
 </div>
 
 <script>/*__MARKED_JS__*/</script>
@@ -208,20 +242,84 @@
     });
   }
 
+  // 全文里"你说的话"用这对标记包着（AppDelegate 写进 transcript 的），
+  // 切出来画成右侧的聊天气泡；其余部分才是模型的回答，照常走 markdown。
+  // 用 split 带捕获组：偶数下标是回答，奇数下标是气泡内容。
+  const USER_MARK = /<!--ns-user-->\n?([\s\S]*?)\n?<!--\/ns-user-->/;
+
+  // 哪几个气泡被点开过。流式刷新是整页重画，不记下来的话一刷新就又折回去。
+  // 气泡在对话里只增不减，所以"第几个"当身份证是稳的；换一段对话时清掉。
+  const expandedBubbles = new Set();
+  let lastText = '';
+
+  function makeBubble(text, index) {
+    const row = document.createElement('div');
+    row.className = 'user-row';
+    const bubble = document.createElement('div');
+    bubble.className = 'user-bubble';
+    const body = document.createElement('div');
+    body.className = 'bubble-text';
+    body.textContent = text;   // 你说的话按原文显示，不当 markdown 渲染
+    bubble.appendChild(body);
+    row.appendChild(bubble);
+
+    const more = document.createElement('div');
+    more.className = 'bubble-more';
+    if (expandedBubbles.has(index)) {
+      more.textContent = '收起 ▴';
+      more.addEventListener('click', () => { expandedBubbles.delete(index); render(lastText); });
+      bubble.appendChild(more);
+    } else {
+      bubble.classList.add('clamped');
+      more.textContent = '展开全文 ▾';
+      more.addEventListener('click', () => { expandedBubbles.add(index); render(lastText); });
+      bubble.appendChild(more);
+    }
+    return row;
+  }
+
+  function render(text) {
+    lastText = String(text || '');
+    const parts = lastText.split(USER_MARK);
+    mdEl.innerHTML = '';
+    let bubbleIndex = 0;
+
+    parts.forEach((part, i) => {
+      if (i % 2 === 1) {
+        mdEl.appendChild(makeBubble(part, bubbleIndex++));
+        return;
+      }
+      if (!part.trim()) return;
+      const block = document.createElement('div');
+      block.className = 'md-block';
+      block.innerHTML = marked.parse(part);
+      sanitize(block);
+      mdEl.appendChild(block);
+    });
+
+    // 只有真被裁掉了内容才显示"展开"，量高度得等元素进了文档才做
+    mdEl.querySelectorAll('.user-bubble.clamped').forEach(bubble => {
+      const body = bubble.querySelector('.bubble-text');
+      if (body.scrollHeight <= body.clientHeight + 2) {
+        bubble.classList.remove('clamped');
+        bubble.querySelector('.bubble-more').remove();
+      }
+    });
+  }
+
   window.nsRender = function (text) {
-    mdEl.innerHTML = marked.parse(text || '');
-    sanitize(mdEl);
+    render(text);
     if (stickToBottom) scroll.scrollTop = scroll.scrollHeight;
   };
 
   window.nsState = function (state, label) {
     document.body.className = 'state-' + state;
     if (label) thinkingLabel.textContent = label;
+    if (state !== 'error') errEl.textContent = '';
     if (state === 'thinking') {
-      mdEl.innerHTML = '';
-      errEl.textContent = '';
+      // 刚发出一问：气泡已经上屏了，滚过去看着小点等回答
       stickToBottom = true;
-      scroll.scrollTop = 0;
+      scroll.scrollTop = scroll.scrollHeight;
     }
   };
 
@@ -230,8 +328,8 @@
   window.nsRestore = function (text) {
     document.body.className = 'state-done';
     errEl.textContent = '';
-    mdEl.innerHTML = marked.parse(text || '');
-    sanitize(mdEl);
+    expandedBubbles.clear();   // 换了一段对话，"第几个气泡"重新数
+    render(text);
     stickToBottom = true;
     scroll.scrollTop = scroll.scrollHeight;
   };

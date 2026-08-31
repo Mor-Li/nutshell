@@ -12,9 +12,6 @@ final class PopoverPanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
 
-    /// 露脸期间借走 ⌘W 的全局热键，见 CloseHotKey 的说明
-    private let closeHotKey = CloseHotKey()
-
     private let header = NSView()
     private var historyButton: NSButton!
     private let modelLabel = NSTextField(labelWithString: "")
@@ -243,30 +240,28 @@ final class PopoverPanel: NSPanel {
         }
 
         // 翻完还是越界（屏幕太小 / 鼠标贴着角落），就直接夹回来
-        x = min(max(x, visible.minX + margin), visible.maxX - size.width - margin)
-        y = min(max(y, visible.minY + margin), visible.maxY - size.height - margin)
-
-        return NSRect(x: x, y: y, width: size.width, height: size.height)
+        return clamp(NSRect(x: x, y: y, width: size.width, height: size.height), near: mouse)
     }
 
-    /// 挪到鼠标旁边并显示出来。用 orderFrontRegardless 而不是 makeKeyAndOrderFront，
+    /// 夹进鼠标所在屏幕的可用区域，保证整个窗口都看得见。
+    /// 多窗口发牌式错位（AppDelegate 那边）错到屏幕边上时也用它兜底。
+    static func clamp(_ frame: NSRect, near mouse: NSPoint) -> NSRect {
+        let screen = NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) }
+            ?? NSScreen.main
+        guard let visible = screen?.visibleFrame else { return frame }
+
+        let margin: CGFloat = 8
+        var frame = frame
+        frame.origin.x = min(max(frame.minX, visible.minX + margin), visible.maxX - frame.width - margin)
+        frame.origin.y = min(max(frame.minY, visible.minY + margin), visible.maxY - frame.height - margin)
+        return frame
+    }
+
+    /// 摆到算好的位置并显示出来。用 orderFrontRegardless 而不是 makeKeyAndOrderFront，
     /// 这样不会打断你正在做的事。
-    func present(near mouse: NSPoint, gap: CGFloat) {
-        setFrame(Self.frame(near: mouse, size: frame.size, gap: gap), display: true)
+    /// 位置由 AppDelegate 算——它知道屏幕上还开着哪几扇窗，好错开摆放。
+    func present(at frame: NSRect) {
+        setFrame(frame, display: true)
         orderFrontRegardless()
-        // 露脸了，⌘W 归我；关窗走 onClose，跟点 ✗ 按钮同一条路
-        closeHotKey.register { [weak self] in self?.onClose?() }
-    }
-
-    /// 平时藏窗走这条（dismiss 用的就是它），把 ⌘W 还回去
-    override func orderOut(_ sender: Any?) {
-        closeHotKey.unregister()
-        super.orderOut(sender)
-    }
-
-    /// 拆窗（重载配置时）也还。unregister 幂等，跟上面撞车了也没事
-    override func close() {
-        closeHotKey.unregister()
-        super.close()
     }
 }
