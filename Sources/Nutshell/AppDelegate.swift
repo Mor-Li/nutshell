@@ -17,6 +17,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// 一次按键会把所有窗的回调全敲响——按一下全关光，那就闹笑话了。
     private let closeHotKey = CloseHotKey()
 
+    /// 上一次解读时剪贴板的版本号（系统每往剪贴板放一次东西就 +1）。
+    /// 快捷键按下来时先对一下号：号没变，说明你没复制新东西，
+    /// 那多半不是想再解读一遍，而是想翻历史——直接把历史清单递上去。
+    /// 真要对同一段再来一次，历史菜单顶上的「＋ 新对话（重读剪贴板）」就是那条路。
+    private var lastExplainedChangeCount: Int?
+
     // MARK: - 生命周期
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -208,7 +214,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// 以前这里是个开关（开着就关、关着就开）；现在窗口可以同时开好几扇——
     /// 选中一段、按一下，再选中另一段、再按一下，两份解读并排摆着对照看。
     /// 关窗不再占用触发键，交给每扇窗自己的 ✗ / Esc / ⌘W。
+    ///
+    /// 同一个快捷键还兼着「翻历史」，两种情况都不开窗解读、改成弹历史清单：
+    /// 1. 按着 ⌥（Option）触发。`NSEvent.modifierFlags` 读的是此刻键盘的真实状态，
+    ///    不要求 Nutshell 在前台——BTT 发 curl 过来那十几毫秒里你手还按着 ⌥，这里就能看见。
+    /// 2. 剪贴板跟上次解读时一模一样（没复制新东西）。
+    /// BTT 那边一个字不用改。
     private func handleTrigger() {
+        let changeCount = NSPasteboard.general.changeCount
+        if NSEvent.modifierFlags.contains(.option) || changeCount == lastExplainedChangeCount {
+            showHistoryFromTrigger()
+            return
+        }
+        lastExplainedChangeCount = changeCount
         let mouse = NSEvent.mouseLocation
         let controller = spawnWindow()
         controller.beginFromClipboard(frame: placementFrame(near: mouse))
@@ -360,6 +378,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func startNewConversation() {
+        // 这条路也算"解读过这份剪贴板"，记下版本号，下次按快捷键才知道该翻历史
+        lastExplainedChangeCount = NSPasteboard.general.changeCount
         historyMenuOwner?.restartFromClipboard()
     }
 
