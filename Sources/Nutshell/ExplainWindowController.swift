@@ -83,6 +83,14 @@ final class ExplainWindowController {
         conversation = stored.messages.map(\.chatMessage)
         transcript = stored.transcript
         accumulated = ""
+        // 存盘的正文里只有图片占位，真图在 messages 里；按同样的顺序重新登记一遍，占位才对得上号
+        var imageIndex = 0
+        for message in conversation {
+            if case .multimodal(_, let images) = message.content {
+                _ = registerImages(images, startingAt: imageIndex)
+                imageIndex += images.count
+            }
+        }
         currentSessionID = stored.id
         currentTitle = stored.title
         currentCreatedAt = stored.createdAt
@@ -147,7 +155,8 @@ final class ExplainWindowController {
             var instruction = config.imagePromptTemplate
             if let note, !note.isEmpty { instruction += "\n\n补充信息：\n\(note)" }
             opening = .multimodal(text: instruction, images: images)
-            var bubble = images.count > 1 ? "📷 图片 ×\(images.count)" : "📷 图片"
+            // 气泡里直接贴真图：先把图登记进页面，气泡文字里只放小占位
+            var bubble = registerImages(images, startingAt: 0).joined(separator: "\n")
             if let note, !note.isEmpty { bubble += "\n" + note }
             transcript = Self.userBubble(bubble)
             thinkingLabel = "正在看图（\(images.count) 张）…"
@@ -176,6 +185,19 @@ final class ExplainWindowController {
         send(retryOnAuthFailure: true)
     }
 
+    /// 把几张图登记进页面，返回每张图在气泡里的占位行。
+    /// id 就是"整段对话里的第几张图"——图只出现在开场那条消息里，顺序稳定，
+    /// 存盘后再恢复时照同样的顺序数一遍就能对上。
+    private func registerImages(_ images: [CapturedInput.ImagePayload], startingAt start: Int) -> [String] {
+        images.enumerated().map { offset, image in
+            let id = "img\(start + offset)"
+            panel.markdownView.registerImage(
+                id: id, dataURL: "data:\(image.mimeType);base64,\(image.base64)"
+            )
+            return "![ns-img](\(id))"
+        }
+    }
+
     /// 把"你说的话"包上标记写进 transcript，viewer.html 认得它，
     /// 会画成右侧的聊天气泡。首尾的空行保证它和前后的 markdown 各成一段。
     private static func userBubble(_ text: String) -> String {
@@ -185,6 +207,7 @@ final class ExplainWindowController {
     /// 复制出去的全文别带渲染标记，翻成人能读的样子
     private static func plainTranscript(_ markdown: String) -> String {
         markdown
+            .replacingOccurrences(of: #"!\[ns-img\]\(img\d+\)"#, with: "📷 图片", options: .regularExpression)
             .replacingOccurrences(of: "<!--ns-user-->\n", with: "【你问】")
             .replacingOccurrences(of: "<!--ns-user-->", with: "【你问】")
             .replacingOccurrences(of: "\n<!--/ns-user-->", with: "")
