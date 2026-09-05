@@ -112,6 +112,25 @@
     user-select: none;
   }
   .bubble-more:hover { opacity: 1; }
+  /* 气泡里的真图：解读图片时把你复制的那张贴出来，不再只写"📷 图片" */
+  .bubble-img {
+    display: block;
+    max-width: 100%;
+    max-height: 260px;
+    border-radius: 9px;
+    margin: 2px 0;
+    object-fit: contain;
+    background: rgba(255,255,255,.12);
+  }
+  .bubble-img + .bubble-img { margin-top: 6px; }
+  .bubble-img.missing {
+    padding: 6px 0;
+    font-size: .9em;
+    opacity: .8;
+  }
+  .user-bubble.has-img { padding: 5px; }
+  .user-bubble.has-img .bubble-text { padding: 2px 6px 3px; }
+  .user-bubble.has-img .bubble-more { padding: 0 6px 3px; }
 
   /* 流式输出时，末尾跟一个闪烁光标 */
   body.state-streaming #md > .md-block:last-child > :last-child::after {
@@ -252,16 +271,46 @@
   const expandedBubbles = new Set();
   let lastText = '';
 
+  // 图片簿：Swift 侧用 nsImage 登记一次，气泡文字里只放 ![ns-img](id) 占位，
+  // 这样流式刷新整页重画时不用带着几百 KB 的 base64 来回过桥。
+  const images = new Map();
+  const IMG_LINE = /^!\[ns-img\]\(([A-Za-z0-9_-]+)\)$/;
+
   function makeBubble(text, index) {
     const row = document.createElement('div');
     row.className = 'user-row';
     const bubble = document.createElement('div');
     bubble.className = 'user-bubble';
+
+    // 开头连着的占位行是图，画成 <img>；剩下的才是文字
+    const lines = text.split('\n');
+    let cut = 0;
+    while (cut < lines.length && IMG_LINE.test(lines[cut])) {
+      const id = lines[cut].match(IMG_LINE)[1];
+      const src = images.get(id);
+      if (src) {
+        const img = document.createElement('img');
+        img.className = 'bubble-img';
+        img.src = src;
+        img.addEventListener('load', () => { if (stickToBottom) scroll.scrollTop = scroll.scrollHeight; });
+        bubble.appendChild(img);
+      } else {
+        const ph = document.createElement('div');
+        ph.className = 'bubble-img missing';
+        ph.textContent = '📷 图片';
+        bubble.appendChild(ph);
+      }
+      cut++;
+    }
+    if (cut > 0) bubble.classList.add('has-img');
+    const rest = lines.slice(cut).join('\n');
+
     const body = document.createElement('div');
     body.className = 'bubble-text';
-    body.textContent = text;   // 你说的话按原文显示，不当 markdown 渲染
-    bubble.appendChild(body);
+    body.textContent = rest;   // 你说的话按原文显示，不当 markdown 渲染
+    if (rest.trim()) bubble.appendChild(body);
     row.appendChild(bubble);
+    if (!rest.trim()) return row;   // 只有图没有字：不需要"展开全文"那套
 
     const more = document.createElement('div');
     more.className = 'bubble-more';
@@ -337,6 +386,10 @@
   window.nsError = function (message) {
     errEl.textContent = message || '出错了';
     document.body.className = 'state-error';
+  };
+
+  window.nsImage = function (id, dataURL) {
+    images.set(id, dataURL);
   };
 
   window.nsFontSize = function (px) {

@@ -102,6 +102,13 @@ final class MarkdownView: NSView {
         run("window.nsFontSize(\(size))")
     }
 
+    /// 把一张图登记进页面的图片簿。正文里只放 `![ns-img](id)` 这么一行小占位，
+    /// 页面画气泡时按 id 把真图取出来贴上——base64 只过桥一次，
+    /// 不然流式刷新每 50ms 全文重发一遍，几百 KB 的图跟着来回跑。
+    func registerImage(id: String, dataURL: String) {
+        run("window.nsImage(\(Self.jsString(id)), \(Self.jsString(dataURL)))")
+    }
+
     var currentMarkdown: String { latestMarkdown }
 
     // MARK: - 内部
