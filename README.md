@@ -190,6 +190,55 @@ API key 可以不写进配置文件：程序会 `source ~/.zshrc` 去读 `$OPENA
 - 拖顶部那条 → 挪窗；拖边角 → 改大小
 - 窗口浮在最上层，但**不抢焦点**——弹出来的时候你原来那个 app 还是前台的
 
+## 终端版：在终端里跟 Gemini 纯聊天
+
+浮窗适合"看不懂、问一句"。要是想坐下来来回聊（讨论方案、磨一篇文章），用终端版：
+
+```bash
+uv tool install --editable ./cli    # 装一次，之后哪个目录都能敲
+nutshell                            # 进入对话，也可以敲短的：nut
+```
+
+就是一问一答，没有工具、没有 agent，所以快。它跟浮窗共用同一份 `config.json`（网关、模型、`systemPrompt`），不用另配。
+
+**整段对话原样留在终端里**：不开全屏界面、不清屏，回答按纯文字一边收一边打。聊完 **Cmd+A 全选、复制**，就是完整的聊天记录，可以直接贴给 Claude 让它落盘成文件。要是终端的滚动历史不够长、前面的被顶掉了，敲 `/copyall` 一样能拿到完整记录（VS Code 终端默认只留 1000 行，可以把 `terminal.integrated.scrollback` 调大）。
+
+**拖东西进来**：把文件、图片、PDF、文件夹从访达或编辑器侧栏拖进终端，终端里显示的是它的路径，发出去时会在原位置换成内容——
+
+| 拖进来的 | 发给模型的 |
+|---|---|
+| 文字类文件（`.md`、代码、`.json`…） | 全文 |
+| 图片（PNG / JPG / HEIC / WebP…） | 图片本身，最长边压到 2048 像素 |
+| PDF | 每一页截成一张高清图，全部页都发 |
+| Word / RTF | 转成纯文字 |
+| 文件夹 | 里面所有文件，按上面的规则逐个处理；在 git 仓库里会跳过 `.gitignore` 忽略的 |
+
+一条消息里可以拖好几样，也可以边打字边拖。附件特别大（超过 20 万 token 或 60 张图）会先问一句再发。因为终端里留的是路径，把聊天记录贴给 Claude 之后，它也能照着路径自己去读那些文件。
+
+**换后端**：默认走公司网关。公司的 key 被批量任务占满时，切到自己的 Google AI Studio key——
+
+```bash
+nutshell --own      # 启动时就走自己的 key
+```
+
+聊到一半也能切：敲 `/own` 切过去，`/work` 切回来，对话不断。自己的 key 在 [AI Studio](https://aistudio.google.com/api-keys) 建好后，写进仓库根目录的 `.env`（这个文件不进 git）：
+
+```
+GEMINI_AI_STUDIO_KEY_NUTSHELL='你的key'
+```
+
+| 命令 | 作用 |
+|---|---|
+| `/own`、`/work` | 切到自己的 key / 切回公司网关 |
+| `/model 名字` | 换模型 |
+| `/models` | 列出当前这把 key 能用的 Gemini 模型 |
+| `/copy` | 复制上一条回答 |
+| `/copyall` | 复制整段聊天记录 |
+| `/new` | 开一段新对话 |
+| `/exit` 或 Ctrl+D | 退出 |
+
+回车发送，**Option+回车**（或先按 Esc 再按回车）换行，粘贴多行不会被拆开发。等回答时按 Ctrl+C 可以打断。`nutshell -c` 接着上一段对话聊；`nutshell -p "一句话"` 只问一句、打印回答就退出。每段对话自动存在 `~/.config/nutshell/chats/`。
+
 ## 为什么要常驻后台
 
 因为要快。如果每次按快捷键才现启动程序、现建窗口，按下去到看见窗至少半秒到一秒起步——那还没开始等模型呢。常驻着就是按下即出。
@@ -235,6 +284,9 @@ Sources/Nutshell/
   Resources/
     viewer.html         渲染页（样式、思考动画、自动滚动）
     marked.min.js       markdown 解析库，内嵌进 app，不联网
+cli/nutshell_cli/       终端版（Python，uv 装）
+  main.py               对话循环、命令、两个后端、流式打字
+  attach.py             认出拖进来的路径，换成文件内容 / 图片 / PDF 页截图
 ```
 
 ## License
