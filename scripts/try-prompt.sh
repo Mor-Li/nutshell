@@ -47,11 +47,19 @@ fi
 # 把 promptTemplate 里的 {content} 换成实际内容，交给 python 拼 JSON 免得引号打架
 PAYLOAD=$(CONTENT="$CONTENT" MODEL="$MODEL" MAX_TOKENS="$MAX_TOKENS" TEMPERATURE="$TEMPERATURE" python3 -c "
 import json, os
+from datetime import datetime
 c = json.load(open('$CONFIG'))
 prompt = c['promptTemplate'].replace('{content}', os.environ['CONTENT'])
+# 跟 app 发的一样：配置里的 systemPrompt 在前，后面接一句现取的本机时间（Gemini 官方格式）
+now = datetime.now().astimezone()
+mins = int(now.utcoffset().total_seconds() // 60)
+zone = 'GMT' if mins == 0 else 'GMT' + ('+' if mins > 0 else '-') + str(abs(mins) // 60) + (':%02d' % (abs(mins) % 60) if mins % 60 else '')
+system = 'Current time is ' + now.strftime('%A, %B ') + str(now.day) + now.strftime(', %Y at ') + str(now.hour % 12 or 12) + now.strftime(':%M %p ') + zone + '.'
+if c.get('systemPrompt'):
+    system = c['systemPrompt'] + '\n\n' + system
 print(json.dumps({
     'model': os.environ['MODEL'],
-    'messages': [{'role': 'user', 'content': prompt}],
+    'messages': [{'role': 'system', 'content': system}, {'role': 'user', 'content': prompt}],
     'max_tokens': int(os.environ['MAX_TOKENS']),
     'temperature': float(os.environ['TEMPERATURE']),
     'stream': True,

@@ -90,12 +90,12 @@ pgrep -x Nutshell
 osascript -e 'tell application "System Events" to make login item at end with properties {path:"'$HOME'/Applications/Nutshell.app", hidden:true}'
 ```
 
-## 配 BetterTouchTool（左右键同时按）
+## 配 BetterTouchTool（双击右键）
 
 程序常驻在后台，听着本机的 `8823` 端口。任何能发 HTTP 请求的东西都能叫醒它，BTT 只是其中一种。
 
 1. 打开 BTT，左上角选 **Normal Mouse**（或你在用的那个鼠标设备）
-2. 点 **+** 添加新触发，触发方式选 **Left & Right Click**（左右键同时点）
+2. 点 **+** 添加新触发，触发方式选**双击右键**
 3. 右边加动作，选 **Execute Terminal Command (Async, non-blocking)**
 4. 命令填：
 
@@ -109,7 +109,7 @@ curl -s http://127.0.0.1:8823/explain
 2. 动作二：**Delay Next Action** → `0.08` 秒（给前台 app 一点时间把内容放进剪贴板）
 3. 动作三：才是上面那条 `curl`
 
-这样配完，你只要**选中 → 左右键一起按**，一步到位。
+这样配完，你只要**选中 → 双击右键**，一步到位。
 
 **同一个手势还能翻历史**，两种情况它都不解读、改成直接弹出历史清单：
 按着 ⌥（Option）再触发；或者什么都没新复制、直接触发（剪贴板跟上次解读时一样）。
@@ -172,7 +172,7 @@ pkill -x Nutshell                       # 退出
 | `maxImages` | 一次最多带几张图 |
 | `maxScannedPDFPages` | 扫描版 PDF 最多看前几页 |
 | `showMenuBarIcon` | 默认 `false`。改成 `true` 会在菜单栏放个气泡图标，里面有打开配置/重载/退出 |
-| `systemPrompt` | 系统提示词，默认空 |
+| `systemPrompt` | 系统提示词，默认空。不管填没填，程序每次都会在它后面自动接一句当前时间（照 Gemini 官方格式："Current time is Wednesday, November 11, 2026 at 11:40 PM GMT+8."），免得模型把今年当成"未来"，这句不用自己写。想用 Gemini 官方提示词，可以从 [asgeirtj/system_prompts_leaks](https://github.com/asgeirtj/system_prompts_leaks/tree/main/Google) 抄身份和知识截止那几段，工具定义和越狱检测那几块别抄 |
 | `historyMenuCount` | 历史菜单里列几条，默认 30（磁盘上的对话一条都不会删） |
 | `rateLimitRetries` | 撞 429 自动重试几次，默认 6；填 0 就是不重试直接报错 |
 | `rateLimitRetryDelay` | 两次重试之间等几秒，默认 2 |
