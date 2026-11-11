@@ -103,6 +103,19 @@ actor LLMClient {
         }
     }
 
+    /// 例："Current time is Wednesday, November 11, 2026 at 11:40 PM GMT+8."
+    /// 照抄 Gemini 官方系统提示词里这一句的格式（AI Studio 版原文是
+    /// "Current time is Wednesday, October 14, 2026 at 1:01 AM GMT."），
+    /// 模型对自家这句话最认。时区跟着本机走。
+    static func currentTimeLine(now: Date = Date()) -> String {
+        let format = DateFormatter()
+        format.locale = Locale(identifier: "en_US_POSIX")
+        format.timeZone = .current
+        format.dateFormat = "EEEE, MMMM d, yyyy 'at' h:mm a"
+        let zone = TimeZone.current.abbreviation(for: now) ?? "GMT"
+        return "Current time is \(format.string(from: now)) \(zone)."
+    }
+
     private func run(
         messages chatMessages: [ChatMessage],
         config: Config,
@@ -114,10 +127,15 @@ actor LLMClient {
             throw Failure(message: "配置里的 baseURL 不合法：\(config.baseURL)")
         }
 
-        var messages: [[String: Any]] = []
+        // 每次请求都现取一次本机时间，接在配置的 systemPrompt 后面（Gemini 官方提示词里
+        // 时间这句也排在身份、知识截止之后）。模型自己不知道今天几号，会按训练时的印象
+        // 当成一两年前，看到"未来"日期就说是幻觉/恶搞。写死在配置里第二天就过期，所以
+        // 放代码里每次现算；追问也走这里，跨零点追问拿到的也是新时间。
+        var system = Self.currentTimeLine()
         if !config.systemPrompt.isEmpty {
-            messages.append(["role": "system", "content": config.systemPrompt])
+            system = config.systemPrompt + "\n\n" + system
         }
+        var messages: [[String: Any]] = [["role": "system", "content": system]]
         for message in chatMessages {
             messages.append(["role": message.role, "content": encode(message.content)])
         }

@@ -61,6 +61,7 @@ import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 import tiktoken
@@ -201,6 +202,22 @@ class LLMResult:
     attempts: int
 
 
+def current_time_line() -> str:
+    """跟 app 里 `LLMClient.currentTimeLine` 一个说法：模型不知道今天几号，不告诉它就会把 2026 当成"未来"。
+
+    格式照抄 Gemini 官方系统提示词："Current time is Wednesday, November 11, 2026 at 11:40 PM GMT+8."
+    """
+    now = datetime.now().astimezone()
+    mins = int(now.utcoffset().total_seconds() // 60)
+    zone = "GMT"
+    if mins:
+        zone += ("+" if mins > 0 else "-") + str(abs(mins) // 60)
+        if abs(mins) % 60:
+            zone += f":{abs(mins) % 60:02d}"
+    hour = now.hour % 12 or 12
+    return f"Current time is {now:%A, %B} {now.day}, {now.year} at {hour}:{now:%M %p} {zone}."
+
+
 def _http_once(prompt: str, model: str, cfg: LLMConfig) -> tuple[str, str, str]:
     """打一次 `/chat/completions`。返回 (kind, text, detail)。
 
@@ -212,7 +229,11 @@ def _http_once(prompt: str, model: str, cfg: LLMConfig) -> tuple[str, str, str]:
         {
             "model": model,
             "max_tokens": MAX_TOKENS,
-            "messages": [{"role": "user", "content": prompt}],
+            "messages": [
+                # 现取的本机时间放 system 里，不拼进 prompt：拼进去缓存 key 每天一变，会天天全量重算
+                {"role": "system", "content": current_time_line()},
+                {"role": "user", "content": prompt},
+            ],
         }
     ).encode("utf-8")
     request = urllib.request.Request(
