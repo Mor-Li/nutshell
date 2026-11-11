@@ -20,3 +20,10 @@ xcuserdata/
 !README.md
 !CLAUDE.md
 .explain-cache/
+
+# Python（cli/ 终端版）
+__pycache__/
+.venv/
+
+# 自己的 API key（GEMINI_AI_STUDIO_KEY_NUTSHELL），绝不进仓库
+.env
