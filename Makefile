@@ -4,7 +4,7 @@ STAGE_DIR  := build
 APP_BUNDLE := $(STAGE_DIR)/$(APP_NAME).app
 INSTALL_DIR := $(HOME)/Applications
 
-.PHONY: all build app install run stop restart clean
+.PHONY: all build app install run stop restart test clean
 
 all: app
 
@@ -47,6 +47,11 @@ stop:
 
 restart: stop
 	@open $(INSTALL_DIR)/$(APP_NAME).app
+
+## 跑自动化测试：不弹窗、不联网、模型接口是假的。
+## 把"家目录"指到一个临时文件夹，测试里存的假对话就不会混进真实的历史
+test:
+	CFFIXED_USER_HOME=$$(mktemp -d -t nutshell-tests) swift test
 
 clean:
 	rm -rf .build $(STAGE_DIR)

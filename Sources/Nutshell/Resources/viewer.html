@@ -43,9 +43,12 @@
     -webkit-font-smoothing: antialiased;
   }
 
-  /* 整个页面就是滚动容器 */
+  /* 整个页面就是滚动容器。
+     网页视图本身一直铺到窗口最底下，底部那截被打字区盖着。
+     --bottom-inset 是被盖住的高度（Swift 那边用 nsBottomInset 告诉我们），
+     滚动容器让出这一截，内容和滚动条就都停在分隔线以上。 */
   #scroll {
-    height: 100%;
+    height: calc(100% - var(--bottom-inset, 0px));
     overflow-y: auto;
     overflow-x: hidden;
     padding: 14px 16px 20px;
@@ -200,6 +203,21 @@
 
   img { max-width: 100%; border-radius: 6px; }
 
+  /* ── 没答成时底下那个「重试」按钮 ── */
+  .retry-row { margin: 10px 0 2px; }
+  .retry-btn {
+    font: inherit;
+    font-size: .92em;
+    color: var(--fg);
+    background: var(--code-bg);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 4px 12px;
+    cursor: pointer;
+  }
+  .retry-btn:hover { background: var(--rule); }
+  .retry-btn:active { opacity: .6; }
+
   /* ── 出错 ── */
   #error {
     display: none;
@@ -327,9 +345,15 @@
     return row;
   }
 
+  // 正文以这个记号结尾 = 最后一轮没答成（Swift 那边 failRound 打上去的），
+  // 在底下摆一个「重试」按钮。记号本身不显示；后面又接了新的一问，它就不在末尾了。
+  const FAILED_MARK = /<!--ns-failed-->/g;
+  const FAILED_AT_END = /<!--ns-failed-->\s*$/;
+
   function render(text) {
     lastText = String(text || '');
-    const parts = lastText.split(USER_MARK);
+    const failed = FAILED_AT_END.test(lastText);
+    const parts = lastText.replace(FAILED_MARK, '').split(USER_MARK);
     mdEl.innerHTML = '';
     let bubbleIndex = 0;
 
@@ -354,6 +378,18 @@
         bubble.querySelector('.bubble-more').remove();
       }
     });
+
+    if (failed) {
+      const row = document.createElement('div');
+      row.className = 'retry-row';
+      const button = document.createElement('button');
+      button.className = 'retry-btn';
+      button.textContent = '↻ 重试';
+      // 跳一个假地址当信号，Swift 那边截住它，把最后这一问重新发一遍
+      button.addEventListener('click', () => { window.location.href = 'nutshell-retry:again'; });
+      row.appendChild(button);
+      mdEl.appendChild(row);
+    }
   }
 
   window.nsRender = function (text) {
@@ -386,6 +422,13 @@
   window.nsError = function (message) {
     errEl.textContent = message || '出错了';
     document.body.className = 'state-error';
+  };
+
+  // 打字区变高变矮了（输入框长高、拖了分隔线）：底部让出新的高度。
+  // 本来贴着底看最新内容的，让完还贴着底，别让最后几行被挡到线下面去。
+  window.nsBottomInset = function (px) {
+    document.documentElement.style.setProperty('--bottom-inset', px + 'px');
+    if (stickToBottom) scroll.scrollTop = scroll.scrollHeight;
   };
 
   window.nsImage = function (id, dataURL) {

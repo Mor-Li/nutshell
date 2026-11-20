@@ -66,8 +66,9 @@ struct Config: Codable {
     /// 关着的时候，重载配置走 `curl 127.0.0.1:<port>/reload`，退出走 `pkill -x Nutshell`。
     var showMenuBarIcon: Bool = false
 
-    /// 一次最多发多少字符给模型，超了截断（防止手滑全选一本书）
-    var maxInputChars: Int = 40000
+    /// 模型的上下文窗口有多大（token）。只用来在顶栏显示"这段对话用了多少 / 一共能用多少"，
+    /// 不拿它截断任何东西：粘贴多少就发多少，超了让模型自己报错。gemini-4-argon 是 100 万。
+    var contextWindow: Int = 1_000_000
 
     /// 一次最多带几张图（选中一堆图片文件时防爆）
     var maxImages: Int = 6
@@ -117,7 +118,7 @@ extension Config {
         systemPrompt        = read(.systemPrompt, fallback.systemPrompt)
         window              = read(.window, fallback.window)
         showMenuBarIcon     = read(.showMenuBarIcon, fallback.showMenuBarIcon)
-        maxInputChars       = read(.maxInputChars, fallback.maxInputChars)
+        contextWindow       = read(.contextWindow, fallback.contextWindow)
         maxImages           = read(.maxImages, fallback.maxImages)
         maxScannedPDFPages  = read(.maxScannedPDFPages, fallback.maxScannedPDFPages)
         maxImageDimension   = read(.maxImageDimension, fallback.maxImageDimension)

@@ -41,6 +41,8 @@ actor LLMClient {
     /// - Parameters:
     ///   - onDelta: 每收到一小段文字回调一次（已经在主线程）
     ///   - onRetry: 撞 429 要等一会儿重来时叫一声（第几次 / 一共几次），让界面能给点交代
+    ///   - onUsage: 答完时报一下这次请求一共用了多少 token（发出去的整段对话 + 这次的回答），
+    ///     也就是这段对话眼下占了多大的上下文
     ///   - onFinish: 结束回调，error 为 nil 表示正常收完
     func stream(
         messages: [ChatMessage],
@@ -48,6 +50,7 @@ actor LLMClient {
         apiKey: String,
         onDelta: @escaping @MainActor (String) -> Void,
         onRetry: @escaping @MainActor (Int, Int) -> Void = { _, _ in },
+        onUsage: @escaping @MainActor (Int) -> Void = { _ in },
         onFinish: @escaping @MainActor (Error?) -> Void
     ) {
         cancel()
@@ -57,7 +60,8 @@ actor LLMClient {
             var attempt = 0
             while true {
                 do {
-                    try await run(messages: messages, config: config, apiKey: apiKey, onDelta: onDelta)
+                    try await run(messages: messages, config: config, apiKey: apiKey,
+                                  onDelta: onDelta, onUsage: onUsage)
                     await MainActor.run { onFinish(nil) }
                     return
                 } catch is CancellationError {
@@ -120,7 +124,8 @@ actor LLMClient {
         messages chatMessages: [ChatMessage],
         config: Config,
         apiKey: String,
-        onDelta: @escaping @MainActor (String) -> Void
+        onDelta: @escaping @MainActor (String) -> Void,
+        onUsage: @escaping @MainActor (Int) -> Void
     ) async throws {
         guard let url = URL(string: config.baseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
                                 + "/chat/completions") else {
@@ -146,6 +151,8 @@ actor LLMClient {
             "max_tokens": config.maxTokens,
             "temperature": config.temperature,
             "stream": true,
+            // 让网关在流的最后补一块用量，顶栏的 token 数就靠它
+            "stream_options": ["include_usage": true],
         ]
 
         var request = URLRequest(url: url)
@@ -186,6 +193,13 @@ actor LLMClient {
                 let code = (err["code"] as? Int) ?? (err["code"] as? String).flatMap(Int.init)
                 // 已经吐过字了就不标成可重试——重发会把前面那半截再说一遍
                 throw Failure(message: redact(msg), status: sawAnyContent ? nil : code)
+            }
+
+            // 用量那一块的 choices 是空的，所以得在下面那道 guard 之前先接住
+            if let usage = json["usage"] as? [String: Any],
+               let total = (usage["total_tokens"] as? Int)
+                   ?? ((usage["prompt_tokens"] as? Int).map { $0 + ((usage["completion_tokens"] as? Int) ?? 0) }) {
+                await MainActor.run { onUsage(total) }
             }
 
             guard let choices = json["choices"] as? [[String: Any]],

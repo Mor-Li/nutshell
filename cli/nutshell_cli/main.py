@@ -39,6 +39,8 @@ DOTENV_PATH = Path(__file__).resolve().parents[2] / ".env"
 #: 附件超过这个量先问一句再发，免得手滑把整个家目录拖进去
 CONFIRM_TOKENS = 200_000
 CONFIRM_IMAGES = 60
+#: 这次请求要上传的图片和 PDF 超过这么多 MB，就提醒一句"上传要等一会儿"
+WARN_UPLOAD_MB = 8
 
 MAX_RETRIES = 6
 
@@ -274,14 +276,30 @@ def _materialize(content: str | list[dict]) -> str | list[dict]:
     if isinstance(content, str):
         return content
     parts = []
+    sent_pdfs: set[str] = set()
     for p in content:
         if p["type"] == "text":
             parts.append({"type": "text", "text": p["text"]})
-        elif Path(p["path"]).exists():
-            parts.append({"type": "image_url", "image_url": {"url": attach.data_url(p)}})
+        elif not Path(p["path"]).exists():
+            parts.append({"type": "text", "text": f"[文件已不在原处：{p['path']}]"})
+        elif p["type"] == "pdf" or p.get("page"):
+            # PDF 整个原文件发过去（两个后端都认这种写法）。老存档里是按页截的图，
+            # 一个 PDF 有好多个 part，这里只在碰到第一个时发一次原文件，其余跳过。
+            if p["path"] not in sent_pdfs:
+                sent_pdfs.add(p["path"])
+                parts.append({"type": "image_url", "image_url": {"url": attach.pdf_data_url(p["path"])}})
         else:
-            parts.append({"type": "text", "text": f"[图片已不在原处：{p['path']}]"})
+            parts.append({"type": "image_url", "image_url": {"url": attach.data_url(p)}})
     return parts
+
+
+def upload_megabytes(messages: list[dict]) -> float:
+    """这次请求里图片和 PDF 一共多大。之前聊过的也算，因为每次都要整段重发。"""
+    total = 0
+    for m in messages:
+        if isinstance(m["content"], list):
+            total += sum(len(p["image_url"]["url"]) for p in m["content"] if p["type"] == "image_url")
+    return total / 1e6
 
 
 # ── 发请求 ──────────────────────────────────────────────────────────────
@@ -495,6 +513,9 @@ def send(chat: Chat, text: str, backend: Backend, model: str, config: dict, inte
             return
 
     chat.messages.append({"role": "user", "content": expanded.content, "raw": text})
+    megabytes = upload_megabytes(chat.api_messages(""))
+    if megabytes > WARN_UPLOAD_MB:
+        print(f"{DIM}这次要上传约 {megabytes:.0f}MB（之前聊过的图和 PDF 每次都要重传），传完才开始回答，网慢的话得等一会儿。{RESET}")
     print("\nGemini>")
     try:
         reply = ask(chat, backend, model, config, render)

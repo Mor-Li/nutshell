@@ -52,6 +52,10 @@ struct StoredSession: Codable {
 
     /// 发给模型的完整消息列表（含图）。切回来接着聊靠的是它。
     var messages: [StoredMessage]
+
+    /// 最后一轮请求用掉的 token 数，也就是这段对话眼下占了多大的上下文。
+    /// 从历史里打开时顶栏照样能显示。老存档没有这一项，读出来是 nil。
+    var tokens: Int? = nil
 }
 
 /// 菜单里要显示的那点信息。

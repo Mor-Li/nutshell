@@ -20,6 +20,11 @@ final class ExplainWindowController {
     private var transcript = ""
     /// 这一轮正在往外蹦的字
     private var accumulated = ""
+    /// 这段对话眼下占了多少 token：最近一次请求发出去的整段对话加上它的回答。
+    /// 网关每答完一轮报一次，顶栏跟着刷新
+    private var contextTokens = 0 {
+        didSet { panel.setTokenUsage(contextTokens, of: config.contextWindow) }
+    }
 
     /// 手上这段对话在历史里的身份证。答完一轮就按这个 id 覆盖存一次盘。
     private(set) var currentSessionID: String?
@@ -39,6 +44,7 @@ final class ExplainWindowController {
         panel = PopoverPanel(size: size)
 
         let markdownView = MarkdownView(fontSize: config.window.fontSize)
+        markdownView.onRetry = { [weak self] in self?.retryLastRound() }
         panel.install(
             markdownView: markdownView,
             modelName: config.model,
@@ -94,6 +100,7 @@ final class ExplainWindowController {
         currentSessionID = stored.id
         currentTitle = stored.title
         currentCreatedAt = stored.createdAt
+        contextTokens = stored.tokens ?? 0
 
         panel.setInputEnabled(true)
         panel.markdownView.restore(markdown: stored.transcript)
@@ -167,6 +174,7 @@ final class ExplainWindowController {
 
         // 新的一段对话，发一张新身份证；标题取剪贴板开头那几个字，历史菜单里认得出
         currentSessionID = SessionStore.newID()
+        contextTokens = 0
         currentTitle = SessionStore.makeTitle(from: input)
         currentCreatedAt = Date()
 
@@ -204,9 +212,19 @@ final class ExplainWindowController {
         "\n\n<!--ns-user-->\n\(text)\n<!--/ns-user-->\n\n"
     }
 
+    /// "你说的话"那个气泡的收尾标记。重试时靠它找到"最后一问到哪儿为止"
+    private static let userBubbleEnd = "<!--/ns-user-->\n\n"
+
+    /// 贴在正文最末尾的记号：最后这一轮没答成。
+    /// viewer.html 看到正文以它结尾，就在底下画一个「重试」按钮。
+    /// 它跟着正文一起存盘，所以关了窗、从历史里再翻出来，按钮还在。
+    /// 后面只要再接上新的一问，它就不在末尾了，按钮自然消失。
+    private static let failedMark = "\n\n<!--ns-failed-->"
+
     /// 复制出去的全文别带渲染标记，翻成人能读的样子
     private static func plainTranscript(_ markdown: String) -> String {
         markdown
+            .replacingOccurrences(of: "<!--ns-failed-->", with: "")
             .replacingOccurrences(of: #"!\[ns-img\]\(img\d+\)"#, with: "📷 图片", options: .regularExpression)
             .replacingOccurrences(of: "<!--ns-user-->\n", with: "【你问】")
             .replacingOccurrences(of: "<!--ns-user-->", with: "【你问】")
@@ -226,15 +244,14 @@ final class ExplainWindowController {
     ///   key 轮换后旧的会失效，缓存里那个就是废的——不重捞会一直 401。
     private func send(retryOnAuthFailure: Bool) {
         guard let apiKey = ConfigStore.resolveAPIKey(config, forceRefresh: !retryOnAuthFailure) else {
-            panel.markdownView.showError(
-                """
-                没找到 API key。
+            accumulated = ""
+            failRound(settled: transcript, note: """
+                ⚠️ 没找到 API key。
 
-                两个办法二选一：
+                两个办法二选一，弄好之后点下面的「重试」：
                 1. 在终端确认 `echo $\(config.apiKeyEnvVar)` 有值（Nutshell 会 source 你的 ~/.zshrc 去读）
                 2. 直接把 key 写进 ~/.config/nutshell/config.json 的 apiKey 字段
-                """
-            )
+                """)
             return
         }
 
@@ -264,6 +281,9 @@ final class ExplainWindowController {
                         self.panel.markdownView.update(markdown: settled + "\n\n" + note)
                     }
                 },
+                onUsage: { [weak self] total in
+                    self?.contextTokens = total
+                },
                 onFinish: { [weak self] error in
                     guard let self else { return }
                     self.panel.setInputEnabled(true)
@@ -288,15 +308,41 @@ final class ExplainWindowController {
                     if self.accumulated.isEmpty && settled.isEmpty {
                         self.panel.markdownView.showError(error.localizedDescription)
                     } else {
-                        self.accumulated += "\n\n⚠️ 中断了：\(error.localizedDescription)"
-                        self.settleRound(settled: settled)
-                        self.panel.markdownView.update(markdown: self.transcript)
-                        self.panel.markdownView.finish()
-                        self.persistCurrentSession()
+                        self.failRound(settled: settled, note: "⚠️ 中断了：\(error.localizedDescription)")
                     }
                 }
             )
         }
+    }
+
+    /// 这一轮没答成的收尾：已经蹦出来的半截话留着，后面接一句出了什么事，
+    /// 再在正文末尾打上"没答成"的记号，页面会据此在底下摆一个「重试」按钮。
+    private func failRound(settled: String, note: String) {
+        accumulated += (accumulated.isEmpty && settled.isEmpty ? "" : "\n\n") + note
+        settleRound(settled: settled)
+        transcript += Self.failedMark
+        panel.markdownView.update(markdown: transcript)
+        panel.markdownView.finish()
+        persistCurrentSession()
+    }
+
+    /// 点了「重试」：把没答成的那一轮整个抹掉，退回到你最后那一问刚发出去的样子，再发一遍。
+    ///
+    /// 抹两处。屏幕上的正文砍到最后一个气泡为止，半截回答和报错那行都不要了。
+    /// 发给模型的历史里，把那条"半截回答加报错"也拿掉，不然模型会以为自己已经答过。
+    private func retryLastRound() {
+        // 只认"正文以没答成的记号结尾"这一种情况：正在回答或者已经答好的，不给重来
+        guard transcript.hasSuffix(Self.failedMark),
+              let lastBubble = transcript.range(of: Self.userBubbleEnd, options: .backwards)
+        else { return }
+
+        transcript = String(transcript[..<lastBubble.upperBound])
+        if conversation.last?.role == "assistant" { conversation.removeLast() }
+        guard !conversation.isEmpty else { return }
+
+        accumulated = ""
+        panel.markdownView.beginRound(markdown: transcript, label: "\(config.model) 正在琢磨…")
+        send(retryOnAuthFailure: true)
     }
 
     /// 一轮答完（或者中途断了）的收尾：把这轮蹦出来的字挪进定稿区，
@@ -323,7 +369,8 @@ final class ExplainWindowController {
             updatedAt: Date(),
             model: config.model,
             transcript: transcript,
-            messages: conversation.map(StoredMessage.init)
+            messages: conversation.map(StoredMessage.init),
+            tokens: contextTokens > 0 ? contextTokens : nil
         ))
     }
 

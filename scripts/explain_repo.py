@@ -3,7 +3,7 @@
 # requires-python = ">=3.11"
 # dependencies = ["tiktoken", "rich"]
 # ///
-"""给仓库里每个代码文件和每一层文件夹生成一份通俗解读，并维护 CLAUDE.md 里的仓库地图。
+"""给仓库里每个代码文件和每一层文件夹生成一份通俗解读，并维护 AGENTS.md 里的仓库地图。
 
 从 SkillTron 的 `scripts/explain_repo.py` 移植（2026-08-31），机制原样保留，
 为 Nutshell 这个仓库改了四处水土：
@@ -21,10 +21,11 @@
 
 ## 两条产物线
 
-- **长篇解读**（给人看）：`AppDelegate.swift` → 同级 `AppDelegate.md`，每个目录
-  一份 `EXPLAIN.md`。全部不进 git（见 `.gitignore`），纯粹给人回头审阅用。
+- **长篇解读**（给人看）：统一放在 `docs/explain/`，里面的层级照搬仓库本身。
+  `Sources/Nutshell/AppDelegate.swift` → `docs/explain/Sources/Nutshell/AppDelegate.md`，
+  每个目录一份 `EXPLAIN.md`。全部不进 git（见 `.gitignore`），纯粹给人回头审阅用。
 - **仓库地图**（给 AI agent 看）：每个文件/目录一句「负责什么、什么时候动它」，
-  拼成缩进树写进 `CLAUDE.md` 的「仓库代码地图」一段。agent 开局读地图，
+  拼成缩进树写进 `AGENTS.md` 的「仓库代码地图」一段。agent 开局读地图，
   不用每次重新把仓库摸一遍。
 
 ## 增量：一棵默克尔树
@@ -86,6 +87,8 @@ ROOT = Path(__file__).resolve().parent.parent
 #: 手上没有当时发出去的东西，只能照着代码重新渲染一遍去猜。存下来之后，
 #: 出问题第一件事就是打开它看，不用猜。
 CACHE_DIR = ROOT / ".explain-cache"
+#: 长篇解读统一放这儿（不进 git），里面的层级照搬仓库本身
+DOCS_DIR = ROOT / "docs" / "explain"
 CACHE_PATH = CACHE_DIR / "index.json"
 PROMPT_DIR = CACHE_DIR / "prompts"
 LLM_CACHE_DIR = CACHE_DIR / "llm"
@@ -400,9 +403,9 @@ def call_llm(
 #  视野：这个仓库里哪些东西要解读
 # ══════════════════════════════════════════════════════════════════════
 
-#: 只解读这些后缀。产物 md 与源文件同名同级（`AppDelegate.swift` → `AppDelegate.md`），
-#: 后缀必须能唯一还原——同名不同后缀的两个源文件会撞车。
-#: `.md` 故意不加：源文件若是 `.md`，产物路径会算出源文件自己，原地覆盖手写文档。
+#: 只解读这些后缀。产物在 `docs/explain/` 下的同一相对位置，后缀换成 `.md`
+#: （`AppDelegate.swift` → `AppDelegate.md`），所以同一目录里同名不同后缀的两个源文件会撞车。
+#: `.md` 故意不加：人写的文档不需要再解读一遍，只上地图（见 MAP_ONLY_GLOBS）。
 #: `.py` 目前只有本脚本自己——它也该上地图，agent 得知道「更新文档来找它」。
 SOURCE_SUFFIXES = (".swift", ".html", ".sh", ".py")
 
@@ -415,7 +418,6 @@ SOURCE_SUFFIXES = (".swift", ".html", ".sh", ".py")
 EXTRA_SOURCES = ("Makefile", "Info.plist")
 
 #: 只上仓库地图、不进解读链的文件：人写的文档。
-#: 为什么不能进解读链：`.md` 源文件的产物路径就是它自己，见 SOURCE_SUFFIXES。
 MAP_ONLY_GLOBS = ("README.md",)
 
 #: 视野黑名单：这些前缀底下就算有源文件也整棵不解读。
@@ -516,7 +518,7 @@ FOLDER_PROMPT = (
 # ──────────────────────────────────────────────────────────────────────
 # 仓库地图的两个 prompt。跟上面两个是**两种东西，各服务各的**，别想着合并：
 # 上面产出给人看的长篇（几千字、带例子），落成一份份独立 md 慢慢读；
-# 这里产出给 AI agent 看的一句话，全仓拼成一张地图进 CLAUDE.md，
+# 这里产出给 AI agent 看的一句话，全仓拼成一张地图进 AGENTS.md，
 # 让 agent 开局就知道「这个需求该改哪个文件」。
 # 从长篇里截前 120 字凑不出来：截出来全是开场白，信息密度极低。
 
@@ -540,7 +542,7 @@ MAP_PROMPT = (
 
 用一句话说清楚这个文件负责什么、什么情况下需要动它。
 
-这句话会进 CLAUDE.md，是给 AI coding agent 看的仓库地图，不是给人看的文档。
+这句话会进 AGENTS.md，是给 AI coding agent 看的仓库地图，不是给人看的文档。
 agent 拿它来判断「手上这个需求该改哪个文件」，所以要写得能支撑这个判断：
 说清楚职责边界，必要时点出关键的类名或函数名。
 
@@ -563,7 +565,7 @@ MAP_FOLDER_PROMPT = (
 
 用一句话说清楚这个目录整体负责什么、什么样的需求该到这里来找。
 
-这句话会进 CLAUDE.md 的仓库地图，跟上面那些子项的说明排在一起，是给 AI coding
+这句话会进 AGENTS.md 的仓库地图，跟上面那些子项的说明排在一起，是给 AI coding
 agent 看的。它先看目录这一句决定要不要往里翻，所以要写出这个目录的职责边界，
 别只是把子项罗列一遍。
 
@@ -571,9 +573,9 @@ agent 看的。它先看目录这一句决定要不要往里翻，所以要写�
 50 字以内，直接给这一句，前后不要任何多余的话。"""
 )
 
-#: 地图写进 CLAUDE.md 的哪一段。认这一行标题，把它到下一个 `## ` 之间整段换掉。
+#: 地图写进 AGENTS.md 的哪一段。认这一行标题，把它到下一个 `## ` 之间整段换掉。
 #: 改这行标题等于放弃旧 section（下次跑会在文件末尾再追加一份，旧的从此不更新、
-#: 变成一份会骗人的过期地图）——真要改，先手工把 CLAUDE.md 里的旧标题一起改掉。
+#: 变成一份会骗人的过期地图）——真要改，先手工把 AGENTS.md 里的旧标题一起改掉。
 MAP_SECTION = "## 仓库代码地图"
 
 #: 地图的缓存，跟解读的 `index.json` 分开——两套 prompt 不同、产物不同，
@@ -585,7 +587,7 @@ MAP_CACHE_PATH = CACHE_DIR / "map.json"
 MAP_FILE_VERSION = hashlib.sha256(MAP_PROMPT.encode("utf-8")).hexdigest()[:16]
 MAP_DIR_VERSION = hashlib.sha256(MAP_FOLDER_PROMPT.encode("utf-8")).hexdigest()[:16]
 
-CLAUDE_MD = ROOT / "CLAUDE.md"
+AGENTS_MD = ROOT / "AGENTS.md"
 
 #: 产物的「出厂版本」：本脚本自身的内容 hash。改 prompt 或生成逻辑都会变 → 全量
 #: 重算。连无关注释也算进去是有意的：两种错的代价完全不对称——多算一轮是几分钟
@@ -703,10 +705,15 @@ def compute_hashes(nodes: dict[str, Node]) -> dict[str, str]:
 
 
 def doc_path(node: Node) -> Path:
-    """这个节点的解读该写到哪。"""
+    """这个节点的解读该写到哪：统一收在 `docs/explain/` 底下，里面的层级照搬仓库本身。
+
+    早先是写在源文件旁边（`AppDelegate.swift` 旁边一份 `AppDelegate.md`），
+    结果源码目录里一半是生成的文档，翻起来乱，SwiftPM 每次编译还要为这些
+    "不认识的文件"报一串警告。2026-11-16 起全部挪进这一个文件夹。
+    """
     if node.is_dir:
-        return ROOT / node.rel / FOLDER_DOC if node.rel != "." else ROOT / FOLDER_DOC
-    return (ROOT / node.rel).with_suffix(".md")
+        return DOCS_DIR / node.rel / FOLDER_DOC if node.rel != "." else DOCS_DIR / FOLDER_DOC
+    return (DOCS_DIR / node.rel).with_suffix(".md")
 
 
 # ------------------------------------------------------------------ 输入组装
@@ -981,7 +988,7 @@ def build_map(
     force: bool,
     dry_run: bool = False,
 ) -> int:
-    """生成/更新仓库地图，写进 CLAUDE.md 的 `MAP_SECTION` 那一段。返回失败数。"""
+    """生成/更新仓库地图，写进 AGENTS.md 的 `MAP_SECTION` 那一段。返回失败数。"""
     nodes = build_tree(tracked_sources(include_map_only=True))
     hashes = compute_hashes(nodes)
     cache = load_map_cache(nodes)
@@ -997,7 +1004,7 @@ def build_map(
         f"（{n_file} 个文件 + {len(stale) - n_file} 个目录）"
     )
 
-    # 干看模式必须退在写 CLAUDE.md 之前——地图这条线最后一步会改一个入库文件，
+    # 干看模式必须退在写 AGENTS.md 之前——地图这条线最后一步会改一个入库文件，
     # `--dry-run` 的承诺是「什么都不动」。
     if dry_run:
         for node in sorted(stale, key=lambda n: (not n.is_dir, n.rel)):
@@ -1101,12 +1108,12 @@ def build_map(
                             persist()  # 每句跑完立刻存，中途 Ctrl-C 花掉的钱不白花
 
     body = render_map(lines)
-    # CLAUDE.md 可能还不存在（第一次跑）：从空文件开始，replace_section 会追加整段。
-    original = CLAUDE_MD.read_text(encoding="utf-8") if CLAUDE_MD.exists() else ""
-    CLAUDE_MD.write_text(replace_section(original, MAP_SECTION, body), encoding="utf-8")
+    # AGENTS.md 可能还不存在（第一次跑）：从空文件开始，replace_section 会追加整段。
+    original = AGENTS_MD.read_text(encoding="utf-8") if AGENTS_MD.exists() else ""
+    AGENTS_MD.write_text(replace_section(original, MAP_SECTION, body), encoding="utf-8")
 
     tok = len(_ENCODING.encode(body, disallowed_special=()))
-    console.print(f"\n地图已写入 {CLAUDE_MD.name} 的「{MAP_SECTION.lstrip('# ')}」一段")
+    console.print(f"\n地图已写入 {AGENTS_MD.name} 的「{MAP_SECTION.lstrip('# ')}」一段")
     console.print(f"  {len(lines)} 行，约 {tok:,} token")
     if failures:
         console.print(f"  [red]{failures} 句没跑成，下次会自动补[/]")
@@ -1162,7 +1169,7 @@ def map_preview(prefix: str, limit: int, cfg: LLMConfig, model: str | None, cons
             except Exception as exc:  # noqa: BLE001
                 results.append((node.rel, f"【失败】{str(exc).splitlines()[0][:80]}"))
 
-    console.print("[bold]地图长这样（这就是会进 CLAUDE.md 的东西）：[/]\n")
+    console.print("[bold]地图长这样（这就是会进 AGENTS.md 的东西）：[/]\n")
     for rel, line in sorted(results):
         console.print(f"- `{rel}` — {line}", highlight=False, markup=False)
 
@@ -1184,7 +1191,7 @@ def build_explanations(
     concurrency: int,
     model: str | None,
 ) -> int:
-    """跑解读：每个源文件一份同名 md、每个目录一份 EXPLAIN.md。返回失败数。"""
+    """跑解读：每个源文件一份同名 md、每个目录一份 EXPLAIN.md，都写在 docs/explain/ 下。返回失败数。"""
     nodes = build_tree(tracked_sources())
     if not nodes:
         console.print("[yellow]没有找到任何源文件[/]")
@@ -1250,12 +1257,12 @@ def main() -> int:
     side.add_argument(
         "--map-only",
         action="store_true",
-        help=f"只跑仓库地图（写进 CLAUDE.md 的「{MAP_SECTION.lstrip('# ')}」一段），跳过解读。",
+        help=f"只跑仓库地图（写进 AGENTS.md 的「{MAP_SECTION.lstrip('# ')}」一段），跳过解读。",
     )
     side.add_argument(
         "--no-map",
         action="store_true",
-        help="只跑解读，不碰 CLAUDE.md 里的仓库地图。",
+        help="只跑解读，不碰 AGENTS.md 里的仓库地图。",
     )
     args = parser.parse_args()
 
@@ -1268,7 +1275,7 @@ def main() -> int:
         return map_preview(args.map_preview, args.map_limit, cfg, args.model, console)
 
     # 默认两个产物一起跑。SkillTron 的教训：同一个入口藏两套产物、默认静默只做
-    # 一半，跑完 CLAUDE.md 纹丝不动还什么都不提示——那是接口的错，不是人记性的错。
+    # 一半，跑完 AGENTS.md 纹丝不动还什么都不提示——那是接口的错，不是人记性的错。
     failed = 0
     if not args.map_only:
         failed += build_explanations(

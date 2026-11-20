@@ -168,7 +168,7 @@ pkill -x Nutshell                       # 退出
 | `window.fontSize` | 正文字号 |
 | `window.gap` | 浮窗离鼠标多远 |
 | `port` | 触发端口，撞车了就换一个 |
-| `maxInputChars` | 一次最多发多少字符（防手滑全选一本书） |
+| `contextWindow` | 模型的上下文窗口有多大（token），默认 100 万。只用来在顶栏显示“这段对话用了多少 / 一共多少”，不截断任何内容，粘贴多少就发多少 |
 | `maxImages` | 一次最多带几张图 |
 | `maxScannedPDFPages` | 扫描版 PDF 最多看前几页 |
 | `showMenuBarIcon` | 默认 `false`。改成 `true` 会在菜单栏放个气泡图标，里面有打开配置/重载/退出 |
@@ -185,6 +185,9 @@ API key 可以不写进配置文件：程序会 `source ~/.zshrc` 去读 `$OPENA
 - **⌘W** → 关一扇。开着好几扇时，关你点过的那扇，都没点过就关最新弹的——连着按就从上往下挨个收。浮窗露着脸的期间 ⌘W 归它——系统级热键直接截胡，后面的 Chrome / VS Code 压根收不到，tab 不会被误关；最后一扇一关，⌘W 立刻物归原主
 - 点右上角 **×**，或点过浮窗之后按 **Esc** → 关掉那一扇
 - 点窗口任意位置 → 光标自动进底部输入框，**可以接着追问**（多轮对话，它记得前面聊了什么）
+- 输入框**回车发送，Shift+回车换行**。平时只占一行，字多了或者粘一大段进来会自己撑高，最多撑到 8 行，再多就在框里滚。它还在回答的时候也能先把下一句打好，等答完再按回车
+- 输入框上面那根线**可以按住上下拖**，想要多高拖多高。双击那根线恢复成自动，发出一条消息之后也会恢复
+- 网断了、超时了、答到一半中断了 → 报错那行底下有个 **↻ 重试**，点一下把刚才那一问重新发一遍，不用再打一次。半截回答和报错会被清掉，不会留在对话里。关了窗从历史里翻出来，这个按钮还在
 - 点右上角**复制图标** → 把整段回答拷走
 - 正文里划选一段 → **Cmd+C** 只拷这一段（输入框里 Cmd+V 粘贴、Cmd+A 全选、Cmd+Z 撤销也都能用）
 - 拖顶部那条 → 挪窗；拖边角 → 改大小
@@ -211,7 +214,7 @@ nutshell                            # 进入对话，也可以敲短的：nut
 |---|---|
 | 文字类文件（`.md`、代码、`.json`…） | 全文 |
 | 图片（PNG / JPG / HEIC / WebP…） | 图片本身，最长边压到 2048 像素 |
-| PDF | 每一页截成一张高清图，全部页都发 |
+| PDF | 整个原文件发过去，Gemini 自己把每一页当图看、同时读文字，全部页都发 |
 | Word / RTF | 转成纯文字 |
 | 文件夹 | 里面所有文件，按上面的规则逐个处理；在 git 仓库里会跳过 `.gitignore` 忽略的 |
 
@@ -279,22 +282,29 @@ source ~/.zshrc && echo ${OPENAI_API_KEY: -4}
 ## 目录
 
 ```
-Sources/Nutshell/
+Sources/Nutshell/       浮窗版（Swift）
   main.swift            启动，注册成不进 Dock 的后台程序
   AppDelegate.swift     总调度：触发、对话历史、可选的菜单栏图标
   TriggerServer.swift   听 127.0.0.1:8823，BTT 用 curl 叫醒它
+  CloseHotKey.swift     有窗开着时接管 ⌘W
   InputCapture.swift    看剪贴板里是文字/PDF/图片/文件，分别处理
+  ExplainWindowController.swift  一扇窗里的一段对话：发问、追问、重试、存档
   LLMClient.swift       调网关，SSE 流式收字
-  PopoverPanel.swift    浮窗本体 + 自适应定位 + 追问输入框
+  PopoverPanel.swift    浮窗本体 + 自适应定位 + 底部打字区的布局
+  ComposerViews.swift   打字区的两个零件：会自己长高的输入框、能拖的分隔线
   MarkdownView.swift    WKWebView 壳，负责渲染
   SessionStore.swift    对话历史落盘（一次对话一个 JSON，只增不删）
   Config.swift          配置读写（prompt 常量在文件顶部）
   Resources/
-    viewer.html         渲染页（样式、思考动画、自动滚动）
+    viewer.html         渲染页（样式、思考动画、自动滚动、重试按钮）
     marked.min.js       markdown 解析库，内嵌进 app，不联网
+Tests/NutshellTests/    浮窗版的自动化测试，`make test` 跑，不弹窗不联网
+scripts/                开发用的辅助脚本
+  explain_repo.py       给每个文件生成通俗解读（放在 docs/explain/，不进 git）
+  try-prompt.sh         不开 app，在终端里单独试 prompt
 cli/nutshell_cli/       终端版（Python，uv 装）
   main.py               对话循环、命令、两个后端、流式打字
-  attach.py             认出拖进来的路径，换成文件内容 / 图片 / PDF 页截图
+  attach.py             认出拖进来的路径，换成文件内容 / 图片 / PDF 原文件
   render.py             把回答里的 Markdown 一段一段渲染到终端
 ```
 

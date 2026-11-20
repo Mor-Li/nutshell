@@ -52,7 +52,7 @@ enum InputCapture {
         // 3) 纯文字
         if let text = pasteboard.string(forType: .string)?
             .trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty {
-            return .text(truncate(text, limit: config.maxInputChars))
+            return .text(text)
         }
 
         throw CaptureError(message: "剪贴板是空的。\n\n先复制点东西——一段文字、一个 PDF、一张图、一个文件都行——再按快捷键。")
@@ -107,11 +107,11 @@ enum InputCapture {
                 note += (note.isEmpty ? "" : "\n\n") + texts.joined(separator: "\n\n")
             }
             return .images(Array(images.prefix(config.maxImages)),
-                           note: note.isEmpty ? nil : truncate(note, limit: config.maxInputChars))
+                           note: note.isEmpty ? nil : note)
         }
 
         if !texts.isEmpty {
-            return .text(truncate(texts.joined(separator: "\n\n"), limit: config.maxInputChars))
+            return .text(texts.joined(separator: "\n\n"))
         }
 
         throw CaptureError(message: "这些文件都读不了：\n" + skipped.joined(separator: "\n"))
@@ -239,13 +239,5 @@ enum InputCapture {
             return nil
         }
         return CapturedInput.ImagePayload(base64: data.base64EncodedString(), mimeType: "image/jpeg")
-    }
-
-    // MARK: - 截断
-
-    private static func truncate(_ text: String, limit: Int) -> String {
-        guard text.count > limit else { return text }
-        return String(text.prefix(limit))
-            + "\n\n…（太长了，后面 \(text.count - limit) 个字符没发出去）"
     }
 }

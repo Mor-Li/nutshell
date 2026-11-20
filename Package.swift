@@ -10,6 +10,12 @@ let package = Package(
             path: "Sources/Nutshell",
             resources: [.copy("Resources")],
             swiftSettings: [.swiftLanguageMode(.v5)]
-        )
+        ),
+        .testTarget(
+            name: "NutshellTests",
+            dependencies: ["Nutshell"],
+            path: "Tests/NutshellTests",
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
     ]
 )

@@ -11,8 +11,14 @@
 
 消息内容用一串 part 表示：
     {"type": "text", "text": "..."}
-    {"type": "image", "path": "/abs/path", "page": None 或 PDF 页码}
-图片只记路径，真正发请求时才读盘编码（见 `data_url`），这样存档小、续聊时也能重新读。
+    {"type": "image", "path": "/abs/path", "page": None}
+    {"type": "pdf", "path": "/abs/path", "pages": 页数}
+图片和 PDF 只记路径，真正发请求时才读盘编码（见 `data_url`、`pdf_data_url`），这样存档小、
+续聊时也能重新读。
+
+PDF 是把原文件整个发过去，Gemini 那边自己会把每一页当图看、同时读出文字。早先的做法是
+在本机把每页截成图再发，效果一样但体积大四十倍（0.8MB 的论文变成 35MB），网慢时要传好几
+分钟。老存档里还留着那种按页的图（image part 带 page 页码），发的时候会自动并回一个 PDF。
 """
 
 from __future__ import annotations
@@ -117,7 +123,10 @@ def _expand_path(path: Path, parts: list[dict], summary: list[str]) -> None:
     else:
         pages = _expand_file(path, str(path), parts)
         if path.suffix.lower() in PDF_EXTS:
-            summary.append(f"{path}（PDF {pages} 页，按页截图）")
+            try:
+                summary.append(f"{path}（PDF {pdf_page_count(path)} 页）")
+            except Exception:
+                summary.append(f"{path}（PDF 打不开）")
         else:
             summary.append(str(path))
 
@@ -137,12 +146,9 @@ def _expand_file(path: Path, label: str, parts: list[dict]) -> int:
         except Exception as exc:  # 加密、损坏的 PDF
             _add_text(parts, f"\n[打不开 PDF {label}：{exc}]\n")
             return 0
-        _add_text(parts, f'\n<pdf path="{label}" pages="{count}">\n')
-        for page in range(1, count + 1):
-            _add_text(parts, f"[第 {page} 页]\n")
-            parts.append({"type": "image", "path": str(path), "page": page})
-        _add_text(parts, "\n</pdf>\n")
-        return count
+        _add_text(parts, f"\n[PDF {label}，共 {count} 页]\n")
+        parts.append({"type": "pdf", "path": str(path), "pages": count})
+        return 0
 
     if ext in TEXTUTIL_EXTS:
         text = _textutil(path)
@@ -209,6 +215,15 @@ def pdf_page_count(path: Path) -> int:
         if doc.needs_pass:
             raise ValueError("有密码")
         return doc.page_count
+
+
+def pdf_data_url(path: str) -> str:
+    """把 PDF 原文件编成 data URL。同一个文件只编一次。"""
+    file = Path(path)
+    key = (str(file), "pdf", file.stat().st_mtime)
+    if key not in _cache:
+        _cache[key] = "data:application/pdf;base64," + base64.b64encode(file.read_bytes()).decode()
+    return _cache[key]
 
 
 def data_url(part: dict) -> str:

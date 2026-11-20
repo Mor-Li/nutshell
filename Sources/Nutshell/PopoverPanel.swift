@@ -5,7 +5,7 @@ import AppKit
 /// 用 NSPanel 而不是普通窗口，关键在 `.nonactivatingPanel`：
 /// 它可以浮在最上层、可以点、可以滚，但**不会把你当前用的 app 切到后台**——
 /// 你在 Safari 里选段话弹出它，Safari 依旧是前台，Dock 不跳，command-tab 顺序不变。
-final class PopoverPanel: NSPanel {
+final class PopoverPanel: NSPanel, NSTextViewDelegate {
 
     /// 允许成为 key window，这样窗口里的文字能选中、能 Cmd+C 拷走。
     /// 但显示时我们用 orderFrontRegardless()，所以它不会主动来抢——你点它才给。
@@ -15,8 +15,24 @@ final class PopoverPanel: NSPanel {
     private let header = NSView()
     private var historyButton: NSButton!
     private let modelLabel = NSTextField(labelWithString: "")
-    private let inputField = NSTextField()
-    private let divider = NSBox()
+    private let inputScroll = NSScrollView()
+    private let inputView = InputTextView.make(fontSize: 13)
+    private let divider = DividerHandle()
+
+    /// 输入框的高度。平时跟着内容走，见 updateInputHeight()
+    private var inputHeight: NSLayoutConstraint!
+    /// 你拽分隔线定下的高度。有值就照它来，nil 就是"跟着内容自动长"
+    private var manualInputHeight: CGFloat?
+    private var dragStartHeight: CGFloat = 0
+    /// 模型正在回答。这时候可以先打字，但回车不发
+    private var isBusy = false
+
+    private static let idlePlaceholder = "接着问点什么…（回车发送，⇧回车换行）"
+    private static let busyPlaceholder = "正在回答…可以先打字"
+    /// 没拽过分隔线时，输入框最多自动长到这么多行，再多就在框里滚
+    private static let autoGrowLines: CGFloat = 8
+    /// 输入框再怎么长，上面的正文至少留这么高
+    private static let minTranscriptHeight: CGFloat = 60
     private var onClose: (() -> Void)?
     private var onCopy: (() -> Void)?
     private var onSubmit: ((String) -> Void)?
@@ -39,6 +55,9 @@ final class PopoverPanel: NSPanel {
         animationBehavior = .utilityWindow
         // 切到别的桌面/全屏 app 时也跟着走
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+
+        // 窗口最小也得装得下顶栏、几行正文和一行输入框
+        contentMinSize = NSSize(width: 280, height: 150)
 
         // 系统那三颗红绿灯在这么小的浮窗上太抢戏，自己画
         for button in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
@@ -81,20 +100,48 @@ final class PopoverPanel: NSPanel {
         buttons.translatesAutoresizingMaskIntoConstraints = false
         header.addSubview(buttons)
 
-        // 底部追问输入框
-        divider.boxType = .separator
+        // 底部追问输入框：多行文本框套一层滚动容器，高度由 updateInputHeight() 说了算
+        inputView.placeholder = Self.idlePlaceholder
+        inputView.delegate = self
+        // 窗口变宽变窄时折行会变，内容高度跟着变，得重新量
+        inputView.postsFrameChangedNotifications = true
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(inputFrameChanged),
+            name: NSView.frameDidChangeNotification, object: inputView
+        )
+
+        inputScroll.documentView = inputView
+        inputScroll.drawsBackground = false
+        inputScroll.borderType = .noBorder
+        inputScroll.hasVerticalScroller = true
+        inputScroll.autohidesScrollers = true
+        inputScroll.scrollerStyle = .overlay
+        inputScroll.translatesAutoresizingMaskIntoConstraints = false
+        effectView.addSubview(inputScroll)
+
+        // 正文和输入框之间那根线，按住能上下拖
         divider.translatesAutoresizingMaskIntoConstraints = false
+        divider.toolTip = "上下拖动调整输入框高度，双击恢复自动"
+        divider.onDragBegan = { [weak self] in
+            guard let self else { return }
+            self.dragStartHeight = self.inputScroll.frame.height
+        }
+        divider.onDrag = { [weak self] delta in
+            guard let self else { return }
+            self.manualInputHeight = self.dragStartHeight + delta
+            self.updateInputHeight()
+            // 存夹过之后的值：拖到头了再往回拖，要立刻跟手，不能先空走一段
+            self.manualInputHeight = self.inputHeight.constant
+        }
+        divider.onDoubleClick = { [weak self] in
+            self?.manualInputHeight = nil
+            self?.updateInputHeight()
+        }
         effectView.addSubview(divider)
 
-        inputField.placeholderString = "接着问点什么…（回车发送）"
-        inputField.font = .systemFont(ofSize: 13)
-        inputField.isBordered = false
-        inputField.drawsBackground = false
-        inputField.focusRingType = .none
-        inputField.target = self
-        inputField.action = #selector(inputSubmitted)
-        inputField.translatesAutoresizingMaskIntoConstraints = false
-        effectView.addSubview(inputField)
+        // 优先级压在"窗口保持原大小"之下：输入框想长高时只能去挤正文，不许把整扇窗撑大
+        inputHeight = inputScroll.heightAnchor.constraint(equalToConstant: inputView.singleLineHeight)
+        inputHeight.priority = NSLayoutConstraint.Priority(490)
 
         NSLayoutConstraint.activate([
             header.topAnchor.constraint(equalTo: effectView.topAnchor),
@@ -113,27 +160,87 @@ final class PopoverPanel: NSPanel {
             buttons.trailingAnchor.constraint(equalTo: header.trailingAnchor, constant: -8),
             buttons.centerYAnchor.constraint(equalTo: header.centerYAnchor),
 
+            // 线画在这个视图的正中间，上下各多出 5pt 是给鼠标抓的
             divider.leadingAnchor.constraint(equalTo: effectView.leadingAnchor),
             divider.trailingAnchor.constraint(equalTo: effectView.trailingAnchor),
-            divider.bottomAnchor.constraint(equalTo: inputField.topAnchor, constant: -8),
+            divider.heightAnchor.constraint(equalToConstant: 11),
+            divider.bottomAnchor.constraint(equalTo: inputScroll.topAnchor, constant: -2),
 
-            inputField.leadingAnchor.constraint(equalTo: effectView.leadingAnchor, constant: 16),
-            inputField.trailingAnchor.constraint(equalTo: effectView.trailingAnchor, constant: -16),
-            inputField.bottomAnchor.constraint(equalTo: effectView.bottomAnchor, constant: -11),
+            // 文本框自己还有 4pt 的内边距，所以字的左边缘仍然落在 16pt 上，和正文对齐
+            inputScroll.leadingAnchor.constraint(equalTo: effectView.leadingAnchor, constant: 12),
+            inputScroll.trailingAnchor.constraint(equalTo: effectView.trailingAnchor, constant: -12),
+            inputScroll.bottomAnchor.constraint(equalTo: effectView.bottomAnchor, constant: -9),
+            inputScroll.heightAnchor.constraint(greaterThanOrEqualToConstant: inputView.singleLineHeight),
+            inputHeight,
         ])
     }
 
-    @objc private func inputSubmitted() {
-        let text = inputField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+    // MARK: - 输入框
+
+    /// 回车发送。模型还在回答时不发，响一声提示，字留在框里等答完再按。
+    private func submitInput() {
+        guard !isBusy else {
+            NSSound.beep()
+            return
+        }
+        let text = inputView.string.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
-        inputField.stringValue = ""
+        inputView.string = ""
+        // 这条发出去了，拽出来的高度也跟着作废，下一条重新从一行开始自动长
+        manualInputHeight = nil
+        updateInputHeight()
         onSubmit?(text)
     }
 
-    /// 等回复的时候把输入框锁上，免得连着发好几条把对话搅乱
+    /// 等回复的时候回车不发，免得连着发好几条把对话搅乱。
+    /// 框本身不锁：趁它回答的工夫可以先把下一句打好。
     func setInputEnabled(_ enabled: Bool) {
-        inputField.isEnabled = enabled
-        inputField.placeholderString = enabled ? "接着问点什么…（回车发送）" : "正在回答…"
+        isBusy = !enabled
+        inputView.placeholder = enabled ? Self.idlePlaceholder : Self.busyPlaceholder
+    }
+
+    /// 算一遍输入框现在该多高。
+    ///
+    /// 没拽过分隔线：内容几行就几行，最多 autoGrowLines 行，再多在框里滚。
+    /// 拽过：就按拽出来的高度。
+    /// 两种情况最后都要夹一下：最矮一行，最高不能把上面的正文挤没。
+    private func updateInputHeight() {
+        guard inputHeight != nil else { return }
+        let oneLine = inputView.singleLineHeight
+        let wanted = manualInputHeight
+            ?? min(inputView.contentHeight, oneLine + inputView.lineHeight * (Self.autoGrowLines - 1))
+
+        // 正文现在比下限多出来的那部分，就是输入框还能再吃掉的空间
+        var ceiling = CGFloat.greatestFiniteMagnitude
+        if let transcript = markdownView, transcript.frame.height > 0 {
+            ceiling = inputScroll.frame.height + max(0, transcript.frame.height - Self.minTranscriptHeight)
+        }
+        let target = max(oneLine, min(wanted, ceiling)).rounded()
+        if abs(inputHeight.constant - target) > 0.5 { inputHeight.constant = target }
+    }
+
+    @objc private func inputFrameChanged() { updateInputHeight() }
+
+    func textDidChange(_ notification: Notification) { updateInputHeight() }
+
+    /// 输入框里的几个特殊按键。
+    /// 用输入法打字时回车是"上屏"，那一下系统自己消化掉了，走不到这里，不会误发。
+    func textView(_ textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+        switch selector {
+        case #selector(NSResponder.insertNewline(_:)):
+            if NSApp.currentEvent?.modifierFlags.contains(.shift) == true {
+                textView.insertNewlineIgnoringFieldEditor(nil)   // ⇧回车：老老实实换行
+            } else {
+                submitInput()
+            }
+            return true
+        case #selector(NSResponder.cancelOperation(_:)):
+            // 多行文本框默认把 Esc 当成"弹补全菜单"，这里改回关窗
+            onClose?()
+            return true
+        default:
+            return false
+        }
     }
 
     /// 点浮窗任意位置就把光标送进输入框——省得你还得瞄准那一条细缝去点。
@@ -144,13 +251,13 @@ final class PopoverPanel: NSPanel {
         super.becomeKey()
 
         guard let markdownView, let contentView else {
-            makeFirstResponder(inputField)
+            makeFirstResponder(inputView)
             return
         }
         let point = contentView.convert(mouseLocationOutsideOfEventStream, from: nil)
         guard !markdownView.frame.contains(point) else { return }
 
-        makeFirstResponder(inputField)
+        makeFirstResponder(inputView)
     }
 
     private func makeButton(symbol: String, tooltip: String, action: Selector) -> NSButton {
@@ -177,19 +284,53 @@ final class PopoverPanel: NSPanel {
         self.onClose = onClose
         self.onSubmit = onSubmit
         self.onHistory = onHistory
-        modelLabel.stringValue = modelName
+        setModelName(modelName)
 
         view.translatesAutoresizingMaskIntoConstraints = false
-        effectView.addSubview(view)
+        // 垫在分隔线下面：正文一直铺到线上，但线上下那圈"抓手"得盖在正文上头才点得着
+        effectView.addSubview(view, positioned: .below, relativeTo: divider)
         NSLayoutConstraint.activate([
             view.topAnchor.constraint(equalTo: header.bottomAnchor),
             view.leadingAnchor.constraint(equalTo: effectView.leadingAnchor),
             view.trailingAnchor.constraint(equalTo: effectView.trailingAnchor),
-            view.bottomAnchor.constraint(equalTo: divider.topAnchor),
+            view.bottomAnchor.constraint(equalTo: divider.centerYAnchor),
+            view.heightAnchor.constraint(greaterThanOrEqualToConstant: Self.minTranscriptHeight),
         ])
+        // 里面的网页固定铺到窗口底，拖线、输入框长高都不改它的大小，原因见 extendPage
+        view.extendPage(toBottomOf: effectView.bottomAnchor)
     }
 
-    func setModelName(_ name: String) { modelLabel.stringValue = name }
+    func setModelName(_ name: String) {
+        modelName = name
+        refreshModelLabel()
+    }
+
+    /// 顶栏模型名后面跟上"这段对话用了多少 / 一共能用多少"，比如 `gemini-4-argon · 2.8万 / 100万 token`。
+    /// 还没答过（0）就只显示模型名
+    func setTokenUsage(_ used: Int, of window: Int) {
+        tokenUsage = (used, window)
+        refreshModelLabel()
+    }
+
+    private var modelName = ""
+    /// 顶栏那行字现在显示的是什么，测试用
+    var modelLabelText: String { modelLabel.stringValue }
+    private var tokenUsage: (used: Int, window: Int) = (0, 0)
+
+    private func refreshModelLabel() {
+        guard tokenUsage.used > 0 else { modelLabel.stringValue = modelName; return }
+        modelLabel.stringValue = "\(modelName) · \(Self.tokenText(tokenUsage.used)) / "
+            + "\(Self.tokenText(tokenUsage.window)) token"
+    }
+
+    /// 9500 → "9500"，28201 → "2.8万"，1000000 → "100万"
+    static func tokenText(_ n: Int) -> String {
+        guard n >= 10_000 else { return "\(n)" }
+        let wan = Double(n) / 10_000
+        return wan >= 100 || wan == wan.rounded()
+            ? "\(Int(wan.rounded()))万"
+            : String(format: "%.1f万", wan)
+    }
 
     @objc private func copyTapped() { onCopy?() }
     @objc private func closeTapped() { onClose?() }

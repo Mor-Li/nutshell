@@ -13,12 +13,8 @@ xcuserdata/
 .claude/
 
 # scripts/explain_repo.py 的产物与缓存：
-# 逐文件解读是同级同名 md（AppDelegate.swift → AppDelegate.md），目录总览叫
-# EXPLAIN.md，全是生成物、只给人本地翻阅，不进仓库。README.md / CLAUDE.md
-# 是人写的（CLAUDE.md 里只有地图那一段归脚本管），显式放行。
-*.md
-!README.md
-!CLAUDE.md
+# 逐文件、逐目录的通俗解读统一生成在 docs/explain/ 里，只给人本地翻阅，不进仓库。
+docs/explain/
 .explain-cache/
 
 # Python（cli/ 终端版）

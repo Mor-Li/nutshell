@@ -10,6 +10,14 @@ final class MarkdownView: NSView {
     private let webView: WKWebView
     private var isPageReady = false
 
+    /// 点了页面里那个「重试」按钮
+    var onRetry: (() -> Void)?
+
+    /// 网页的下沿贴着谁。默认贴自己的下沿，装进浮窗后改成一直铺到窗口底，见 extendPage
+    private var pageBottom: NSLayoutConstraint!
+    /// 上一次告诉页面"底下让出多高"，没变就不重复说
+    private var lastBottomInset: CGFloat = -1
+
     /// 页面还没加载好时先攒着，加载完一次性补上
     private var pendingCommands: [String] = []
 
@@ -29,9 +37,12 @@ final class MarkdownView: NSView {
         webView.navigationDelegate = self
         webView.translatesAutoresizingMaskIntoConstraints = false
         addSubview(webView)
+        // 网页可以比自己高（见 extendPage），超出自己下沿的那截裁掉不显示
+        clipsToBounds = true
+        pageBottom = webView.bottomAnchor.constraint(equalTo: bottomAnchor)
         NSLayoutConstraint.activate([
             webView.topAnchor.constraint(equalTo: topAnchor),
-            webView.bottomAnchor.constraint(equalTo: bottomAnchor),
+            pageBottom,
             webView.leadingAnchor.constraint(equalTo: leadingAnchor),
             webView.trailingAnchor.constraint(equalTo: trailingAnchor),
         ])
@@ -41,6 +52,30 @@ final class MarkdownView: NSView {
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    // MARK: - 跟底部打字区的配合
+
+    /// 让网页一直铺到 `anchor`（浮窗的最底边），不再跟着自己的下沿伸缩。
+    ///
+    /// 为什么这么绕：底部输入框会长高、分隔线能拖，正文这块的高度就跟着变。
+    /// 如果每次都去改网页视图的大小，网页那边有时跟不上，线往下拖回去之后
+    /// 多出来的那一截会空着不画（2026-11-16 用户遇到的"线上面一块空白"）。
+    /// 所以网页视图的大小固定不动：它始终从顶栏铺到窗口底，被打字区挡住的那截
+    /// 由本视图裁掉，再明确告诉页面"底下让出多高"，页面自己把内容和滚动条收到线以上。
+    func extendPage(toBottomOf anchor: NSLayoutYAxisAnchor) {
+        pageBottom.isActive = false
+        pageBottom = webView.bottomAnchor.constraint(equalTo: anchor)
+        pageBottom.isActive = true
+    }
+
+    override func layout() {
+        super.layout()
+        // 网页比自己露出来的部分高出多少，页面底部就让出多少
+        let inset = max(0, webView.frame.height - bounds.height).rounded()
+        guard inset != lastBottomInset else { return }
+        lastBottomInset = inset
+        run("window.nsBottomInset(\(inset))")
+    }
 
     // MARK: - 对外接口
 
@@ -183,6 +218,13 @@ extension MarkdownView: WKNavigationDelegate {
             if let target = URL(string: raw), ["http", "https"].contains(target.scheme ?? "") {
                 NSWorkspace.shared.open(target)
             }
+            decisionHandler(.cancel)
+            return
+        }
+
+        // 「重试」按钮也是同一个路数：页面跳一个假地址，我们在这儿截住当成信号
+        if url.scheme == "nutshell-retry" {
+            onRetry?()
             decisionHandler(.cancel)
             return
         }
