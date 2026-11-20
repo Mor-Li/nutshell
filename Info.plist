@@ -6,6 +6,8 @@
 	<string>Nutshell</string>
 	<key>CFBundleDisplayName</key>
 	<string>Nutshell</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
 	<key>CFBundleExecutable</key>
 	<string>Nutshell</string>
 	<key>CFBundleIdentifier</key>

@@ -18,6 +18,8 @@ app: build
 	mkdir -p $(APP_BUNDLE)/Contents/MacOS $(APP_BUNDLE)/Contents/Resources
 	cp $(BUILD_DIR)/$(APP_NAME) $(APP_BUNDLE)/Contents/MacOS/$(APP_NAME)
 	cp Info.plist $(APP_BUNDLE)/Contents/Info.plist
+	@# app 图标，Info.plist 的 CFBundleIconFile 指着它。换图标见 scripts/make_icon.py
+	cp icon/AppIcon.icns $(APP_BUNDLE)/Contents/Resources/AppIcon.icns
 	@# SPM 把资源打进 <包名>_<target名>.bundle，搬到 app 的 Resources 下 Bundle.module 才找得到
 	@if [ -d "$(BUILD_DIR)/$(APP_NAME)_$(APP_NAME).bundle" ]; then \
 		cp -R "$(BUILD_DIR)/$(APP_NAME)_$(APP_NAME).bundle" $(APP_BUNDLE)/Contents/Resources/; \

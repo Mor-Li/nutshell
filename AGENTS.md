@@ -14,7 +14,8 @@ macOS 上的浮窗小工具。复制点东西、按一下快捷键，鼠标旁�
 | `Sources/Nutshell/Resources/` | 浮窗里显示正文的那张网页 `viewer.html`，和它用的 Markdown 解析库。打包时原样带进 app |
 | `Tests/NutshellTests/` | 浮窗版的自动化测试。不弹窗、不联网，模型接口是假的 |
 | `cli/` | 终端版。`cli/nutshell_cli/` 是源码，`pyproject.toml` 和 `uv.lock` 是依赖声明 |
-| `scripts/` | 开发时用的辅助脚本，不随 app 发布。`explain_repo.py` 生成代码解读和本文件末尾的地图，`try-prompt.sh` 在终端里单独试 prompt |
+| `icon/` | app 图标。`AppIcon-source.png` 是没切圆角的正方形图案（2026-11-20 用 GPT Image 2.5 生成：裂开的榛子里冒出一个对话气泡），`AppIcon.png` 和 `AppIcon.icns` 由 `scripts/make_icon.py` 生成，`make app` 把 icns 放进 app |
+| `scripts/` | 开发时用的辅助脚本，不随 app 发布。`explain_repo.py` 生成代码解读和本文件末尾的地图，`try-prompt.sh` 在终端里单独试 prompt，`make_icon.py` 把 `icon/AppIcon-source.png` 切成 macOS 图标形状并打成 icns（`uv run scripts/make_icon.py`） |
 | `docs/explain/` | `explain_repo.py` 生成的逐文件、逐目录通俗解读，给人翻阅用。里面的层级照搬仓库本身。不进 git |
 | 根目录 | `Package.swift` 是构建配置，`Info.plist` 是 app 的身份信息，`Makefile` 是打包安装命令，`README.md` 是给人看的使用说明，`AGENTS.md` 是本文件，`.env` 放终端版直连 Gemini 用的密钥（不进 git） |
 | `.build/` 和 `build/` | 构建产物，前者是 SwiftPM 的中间文件，后者是打好的 `Nutshell.app`。都不进 git，随时可删 |
