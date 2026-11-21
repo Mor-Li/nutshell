@@ -203,6 +203,18 @@
 
   img { max-width: 100%; border-radius: 6px; }
 
+  /* ── 数学公式（KaTeX 排的）── */
+  .katex { font-size: 1.08em; }
+  /* 独占一行的长公式自己横向滚，别把整页撑开 */
+  .katex-display {
+    margin: .7em 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 2px 0;
+  }
+  /* 公式写错了 KaTeX 会把原文标红，颜色跟着主题走 */
+  .katex-error { color: var(--danger) !important; }
+
   /* ── 没答成时底下那个「重试」按钮 ── */
   .retry-row { margin: 10px 0 2px; }
   .retry-btn {
@@ -239,7 +251,9 @@
   <div id="error"></div>
 </div>
 
+<style>/*__KATEX_CSS__*/</style>
 <script>/*__MARKED_JS__*/</script>
+<script>/*__KATEX_JS__*/</script>
 
 <script>
 (function () {
@@ -249,6 +263,52 @@
   const thinkingLabel = document.getElementById('thinking-label');
 
   marked.setOptions({ breaks: true, gfm: true });
+
+  // 数学公式：模型会写 $…$、$$…$$、\(…\)、\[…\] 四种。
+  // 必须在 marked 解析的同时把公式整段认出来、原样交给 KaTeX，
+  // 不然 marked 会先把公式里的 \\ 吃成 \、把 _x_ 当成斜体，公式就碎了。
+  // 代码块和行内代码里的 $ 不会被当成公式：marked 先认代码，轮不到这里。
+  function renderMath(tex, display) {
+    if (typeof katex === 'undefined') {
+      const span = document.createElement('span');
+      span.textContent = display ? '$$' + tex + '$$' : '$' + tex + '$';
+      return span.outerHTML;
+    }
+    return katex.renderToString(tex, { displayMode: display, throwOnError: false, strict: 'ignore' });
+  }
+
+  marked.use({ extensions: [
+    {
+      // 独占一行（或几行）的公式块
+      name: 'mathBlock',
+      level: 'block',
+      start(src) { const m = src.match(/^ {0,3}(\$\$|\\\[)/m); return m ? m.index : undefined; },
+      tokenizer(src) {
+        const m = /^ {0,3}\$\$([\s\S]+?)\$\$[ \t]*(?:\n|$)/.exec(src)
+               || /^ {0,3}\\\[([\s\S]+?)\\\][ \t]*(?:\n|$)/.exec(src);
+        if (m) return { type: 'mathBlock', raw: m[0], text: m[1].trim() };
+      },
+      renderer(token) { return renderMath(token.text, true) + '\n'; },
+    },
+    {
+      // 夹在句子里的公式
+      name: 'mathInline',
+      level: 'inline',
+      start(src) { const m = src.match(/\$|\\[(\[]/); return m ? m.index : undefined; },
+      tokenizer(src) {
+        let m;
+        if ((m = /^\$\$([\s\S]+?)\$\$/.exec(src)))   return { type: 'mathInline', raw: m[0], text: m[1].trim(), display: true };
+        if ((m = /^\\\[([\s\S]+?)\\\]/.exec(src)))   return { type: 'mathInline', raw: m[0], text: m[1].trim(), display: true };
+        if ((m = /^\\\(([\s\S]+?)\\\)/.exec(src)))   return { type: 'mathInline', raw: m[0], text: m[1].trim(), display: false };
+        // 单个 $ 最容易跟钱数撞车（"$5 到 $10"）：开头 $ 后面不能是空格，
+        // 结尾 $ 前面不能是空格、后面不能紧跟数字，中间不跨行
+        if ((m = /^\$(?![\s$])((?:\\.|[^\\$\n])+?)(?<!\s)\$(?!\d)/.exec(src))) {
+          return { type: 'mathInline', raw: m[0], text: m[1], display: false };
+        }
+      },
+      renderer(token) { return renderMath(token.text, token.display); },
+    },
+  ]});
 
   // 只要用户自己往上滚过，就别再抢着把他拽回底部
   let stickToBottom = true;

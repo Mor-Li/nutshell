@@ -182,12 +182,17 @@ final class MarkdownView: NSView {
             encoding: .utf8
         )) ?? "<p>viewer.html 没打进 app 里</p>"
 
-        let markedURL = bundle.url(forResource: "Resources/marked.min", withExtension: "js")
-            ?? bundle.url(forResource: "marked.min", withExtension: "js")
-        let marked = markedURL.flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
+        func resource(_ name: String, _ ext: String) -> String {
+            let url = bundle.url(forResource: "Resources/\(name)", withExtension: ext)
+                ?? bundle.url(forResource: name, withExtension: ext)
+            return url.flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
+        }
 
+        // KaTeX 排数学公式，字体已经由 scripts/vendor_katex.py 转成 base64 写进 CSS
         return template
-            .replacingOccurrences(of: "/*__MARKED_JS__*/", with: marked)
+            .replacingOccurrences(of: "/*__KATEX_CSS__*/", with: resource("katex.inline.min", "css"))
+            .replacingOccurrences(of: "/*__MARKED_JS__*/", with: resource("marked.min", "js"))
+            .replacingOccurrences(of: "/*__KATEX_JS__*/", with: resource("katex.min", "js"))
             .replacingOccurrences(of: "--font-size: 14.5px;", with: "--font-size: \(fontSize)px;")
     }
 }
