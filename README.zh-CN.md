@@ -41,7 +41,7 @@
     <td width="50%" valign="top">🧮 <b>公式排得像公式</b><br><code>$…$</code>、<code>$$…$$</code>、<code>\(…\)</code>、<code>\[…\]</code> 都用 KaTeX 排版，完全不联网。"$5 到 $10" 这种钱数不会被误认成公式。</td>
   </tr>
   <tr>
-    <td width="50%" valign="top">🔌 <b>模型和密钥你自己定</b><br>任何 OpenAI 兼容的 <code>/chat/completions</code> 接口都能用：OpenAI、Gemini、默认网关，或者本机的 Ollama。</td>
+    <td width="50%" valign="top">🔌 <b>模型和密钥你自己定</b><br>任何 OpenAI 兼容的 <code>/chat/completions</code> 接口都能用：OpenAI、Gemini、公司自己的网关，或者本机的 Ollama。</td>
     <td width="50%" valign="top">🖥 <b>还有终端版</b><br>在终端里跟模型快速来回聊，没有工具、没有 agent，和浮窗共用同一份配置。拖文件进来就能附上。</td>
   </tr>
 </table>
