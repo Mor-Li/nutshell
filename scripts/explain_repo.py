@@ -418,7 +418,7 @@ SOURCE_SUFFIXES = (".swift", ".html", ".sh", ".py")
 EXTRA_SOURCES = ("Makefile", "Info.plist")
 
 #: 只上仓库地图、不进解读链的文件：人写的文档。
-MAP_ONLY_GLOBS = ("README.md",)
+MAP_ONLY_GLOBS = ("README.md", "README.zh-CN.md")
 
 #: 视野黑名单：这些前缀底下就算有源文件也整棵不解读。
 #: 本仓的 `build/`、`.build/` 都在 gitignore 里，ls-files 天然抓不到，暂时没有要拉黑的。

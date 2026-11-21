@@ -1,332 +1,335 @@
 # Nutshell
 
-选中 → 复制 → 按一下 → 鼠标旁边冒出一个小窗，用大白话给你讲清楚刚才那段是啥。
+**English** | [中文](README.zh-CN.md)
 
-每按一次都开一扇**新**窗，可以同时开好几扇：这边解读着一段论文，那边再复制一段报错接着按，两份解读并排摆着对照看。看完点 ×（或 ⌘W / Esc）挨个收掉。
+Select → copy → press once → a small window pops up next to your cursor and explains, in plain words, what you just copied.
 
-名字取自英文谚语 *in a nutshell*（一句话说清、简而言之）。
+Every press opens a **new** window, and you can keep several open at once: one explaining a paragraph of a paper, another explaining an error message you copied a moment later, side by side for comparison. When you are done, close them one by one with × (or ⌘W / Esc).
+
+The name comes from the English idiom *in a nutshell*.
 
 ---
 
 ## News
 
-- **2026-11-21** 浮窗能排数学公式了：`$…$`、`$$…$$`、`\(…\)`、`\[…\]` 四种写法都认，钱数（"$5 到 $10"）和代码里的 `$` 不会被误当成公式。不联网，排版库和字体都打包在 app 里。图标换成扁平风，去掉了外面那圈方框。
-- **2026-11-20** 粘贴进来的内容不再截断，顶栏实时显示这段对话用了多少 token。底部输入框会随字数自己长高，也能拖着调高度。回答到一半断了，底下有「↻ 重试」按钮。app 有了自己的图标。
-- **2026-11-12** 加了终端版：在终端里跟 Gemini 来回聊，拖文件进来原地附上内容，回答按 Markdown 排好版显示，随时能接着以前的对话聊。
-- **2026-11-11** 每次请求自动带上当前时间，模型不会再把 2026 年当成"未来"。
-- **2026-09-06** 解读图片时，气泡里直接贴出那张图。同一个手势也能翻历史：按着 ⌥ 触发，或者剪贴板没换新内容，就弹出历史清单。
-- **2026-08-31** 每按一次都弹一扇新窗，几扇窗并排对照看。你问的话画成聊天气泡。
-- **2026-08-30** ⌘W 关浮窗：浮窗开着时借走 ⌘W，后面 Chrome 的标签页不会被误关。
-- **2026-08-16** 修好 ⌘C、⌘V：划字复制、输入框粘贴都正常了。
-- **2026-08-14** 被限流（HTTP 429）时自动重试，每 2 秒一次，最多 6 次。
-- **2026-08-13** 第一版：选中、复制、按一下，鼠标旁边弹窗用大白话讲清楚。
+- **2026-11-21** Math rendering in the popup: `$…$`, `$$…$$`, `\(…\)` and `\[…\]` are all typeset, while prices ("$5 to $10") and `$` inside code stay as plain text. Works offline, with the library and fonts bundled into the app. New flat-style icon, without the rounded-square frame around it.
+- **2026-11-20** Pasted content is no longer truncated, and the title bar shows how many tokens the conversation has used. The input box grows as you type and can be resized by dragging. If an answer breaks off halfway, a "↻ Retry" button appears below it. The app gets its own icon.
+- **2026-11-12** New terminal version: chat with Gemini back and forth in the terminal, drag files in to attach their contents, see answers rendered as Markdown, and resume earlier conversations at any time.
+- **2026-11-11** Every request now carries the current time, so the model no longer treats 2026 as "the future".
+- **2026-09-06** When explaining an image, the bubble shows the image itself. The same gesture can also open history: trigger it while holding ⌥, or when the clipboard hasn't changed.
+- **2026-08-31** Every trigger opens a new window, so you can compare several side by side. Your own messages are drawn as chat bubbles.
+- **2026-08-30** ⌘W closes the popup: while a popup is open it borrows ⌘W, so Chrome tabs behind it are no longer closed by accident.
+- **2026-08-16** Fixed ⌘C and ⌘V: copying selected text and pasting into the input box now work.
+- **2026-08-14** Automatic retry when rate-limited (HTTP 429): once every 2 seconds, up to 6 times.
+- **2026-08-13** First release: select, copy, press once, and a popup next to the cursor explains it in plain words.
 
-## 它解决什么问题
+## What problem it solves
 
-看英文论文、看别人甩过来的一大段技术文档、看一封云里雾里的邮件——
-以前得切到浏览器、打开某个 AI 网页、粘进去、等、再切回来。切来切去，思路就断了。
+Reading an English paper, a long technical document someone sent you, or a confusing email used to mean: switch to the browser, open some AI website, paste, wait, switch back. All that switching breaks your train of thought.
 
-现在：复制，按一下快捷键，答案就浮在你正在看的东西旁边。不切窗口，不打断。
+Now: copy, press a shortcut, and the answer floats right next to what you are reading. No window switching, no interruption.
 
-## 能喂给它什么
+## What you can feed it
 
-不只是文字。复制什么它就认什么：
+Not just text. It recognizes whatever you copy:
 
-| 你复制的东西 | 它怎么处理 |
+| What you copy | How it handles it |
 |---|---|
-| 一段文字 | 直接解读 |
-| 一个 PDF 文件 | 提取文字后解读 |
-| 扫描版 PDF（没有文字层） | 自动把前几页渲染成图片，看图讲 |
-| 一张图 / 一张截图 | 走多模态，看图讲 |
-| Word、RTF、HTML | 交给系统自带的 `textutil` 转成纯文本 |
-| .txt/.md/.json/.csv/源码 | 直接读 |
-| 一次选中好几个文件 | 文本拼在一起，图片最多带 6 张 |
+| A piece of text | Explains it directly |
+| A PDF file | Extracts the text, then explains |
+| A scanned PDF (no text layer) | Renders the first few pages as images and explains from those |
+| An image / a screenshot | Sends it to a multimodal model and explains the picture |
+| Word, RTF, HTML | Converts to plain text with the built-in `textutil` |
+| .txt/.md/.json/.csv/source code | Reads it directly |
+| Several files selected at once | Text is concatenated, up to 6 images are attached |
 
-## 聊过的都留着
+## Everything you chat about is kept
 
-窗底下有个输入框，回车就能接着追问，它记得前面聊了什么。
+There is an input box at the bottom of the window. Press Return to ask a follow-up, and it remembers what was said before.
 
-**每答完一轮就自动存一次盘**，存在 `~/.config/nutshell/sessions/`，一次对话一个 JSON 文件。
-**只增不删**——不设上限、不自动清理，攒多少留多少。
+**Each finished round is saved to disk automatically**, under `~/.config/nutshell/sessions/`, one JSON file per conversation.
+**Append only**: no limit, no automatic cleanup, everything is kept.
 
-想回到之前某段对话，点浮窗左上角那个小钟：
+To go back to an earlier conversation, click the little clock in the top-left corner of the popup:
 
 ```
 ┌─────────────────────────────────────┐
-│ 🕘  gemini-3.1-pro-preview    ⧉  ✕ │  ← 点这个钟
+│ 🕘  gemini-3.1-pro-preview    ⧉  ✕ │  ← click this clock
 ├─────────────────────────────────────┤
    ┌───────────────────────────────┐
-   │  ＋ 新对话（重读剪贴板）        │
+   │  ＋ New chat (re-read clipboard) │
    │ ───────────────────────────── │
-   │  今天                          │
-   │  ✓ SSE 断线重连那段…    15:04  │
-   │    Transformer 注意力…  11:22  │
-   │  昨天                          │
-   │    这封邮件在说啥…      22:10  │
+   │  Today                         │
+   │  ✓ SSE reconnect logic…  15:04 │
+   │    Transformer attention… 11:22│
+   │  Yesterday                     │
+   │    What is this email…   22:10 │
    │ ───────────────────────────── │
-   │  共 37 条 · 在访达中打开        │
-   │  清空历史…                     │
+   │  37 in total · Show in Finder  │
+   │  Clear history…                │
    └───────────────────────────────┘
 ```
 
-点哪条切哪条：窗里恢复成当时的样子，模型那边的上下文也一起接上，直接在底下接着问。
-打勾的那条就是你现在待着的这段。
+Click any entry to switch to it: the window is restored to how it looked, the model's context is restored too, and you can keep asking right there.
+The checked entry is the conversation you are currently in.
 
-几个细节：
+A few details:
 
-- 标题是剪贴板开头那几个字，自动取的，不用起名
-- **按住 Option**，某一条会变成「删除这条」
-- 菜单默认只列最近 30 条（列太多会拖出屏幕）；全部都在那个文件夹里，菜单底下有直达访达的入口。想多列几条就改配置里的 `historyMenuCount`
-- 图片也一起存，所以切回一段看图的对话，模型还看得见那张图
+- Titles are taken automatically from the first few words of the clipboard, no naming needed
+- **Hold Option** and an entry turns into "Delete this one"
+- The menu lists only the latest 30 entries by default (more would run off the screen). All of them are in that folder, and the bottom of the menu has a shortcut to open it in Finder. To list more, change `historyMenuCount` in the config
+- Images are saved too, so when you switch back to a conversation about an image, the model can still see it
 
-按快捷键**永远是开一段新的**——这条没变，日常那个「复制→按一下」的手感不受影响。
+Pressing the shortcut **always starts a new conversation**. That never changes, so the everyday "copy → press" feel stays the same.
 
-## 装
+## Install
 
 ```bash
 make install
 ```
 
-编译 + 打包 + 装到 `~/Applications/Nutshell.app` + 启动。
+Builds, packages, installs to `~/Applications/Nutshell.app`, and launches it.
 
-它**没有界面**——不在 Dock 里，默认也不占菜单栏，就一个后台进程听着端口。想确认它在不在跑：
+It **has no UI of its own**: no Dock icon, no menu bar item by default, just a background process listening on a port. To check whether it is running:
 
 ```bash
 pgrep -x Nutshell
 ```
 
-**不需要任何系统权限**——它只读剪贴板，而读剪贴板是白给的。
+**No system permissions needed**: it only reads the clipboard, and reading the clipboard is free.
 
-开机自启（装完跑一次就行）：
+Launch at login (run once after installing):
 
 ```bash
 osascript -e 'tell application "System Events" to make login item at end with properties {path:"'$HOME'/Applications/Nutshell.app", hidden:true}'
 ```
 
-## 配 BetterTouchTool（双击右键）
+## Setting up BetterTouchTool (double right-click)
 
-程序常驻在后台，听着本机的 `8823` 端口。任何能发 HTTP 请求的东西都能叫醒它，BTT 只是其中一种。
+The app stays in the background and listens on local port `8823`. Anything that can send an HTTP request can wake it up. BTT is just one option.
 
-1. 打开 BTT，左上角选 **Normal Mouse**（或你在用的那个鼠标设备）
-2. 点 **+** 添加新触发，触发方式选**双击右键**
-3. 右边加动作，选 **Execute Terminal Command (Async, non-blocking)**
-4. 命令填：
+1. Open BTT and pick **Normal Mouse** (or whichever mouse device you use) in the top-left
+2. Click **+** to add a new trigger and choose **double right-click**
+3. On the right, add an action: **Execute Terminal Command (Async, non-blocking)**
+4. Use this command:
 
 ```bash
 curl -s http://127.0.0.1:8823/explain
 ```
 
-**建议再多加一步，连 Cmd+C 都省了**：在上面第 3 步之前，先加两个动作，让 BTT 替你按复制——
+**Recommended: add one more step and skip Cmd+C entirely.** Before step 3 above, add two actions so BTT presses copy for you:
 
-1. 动作一：**Send Keyboard Shortcut** → `⌘C`
-2. 动作二：**Delay Next Action** → `0.08` 秒（给前台 app 一点时间把内容放进剪贴板）
-3. 动作三：才是上面那条 `curl`
+1. Action one: **Send Keyboard Shortcut** → `⌘C`
+2. Action two: **Delay Next Action** → `0.08` seconds (gives the frontmost app time to put the content on the clipboard)
+3. Action three: the `curl` command above
 
-这样配完，你只要**选中 → 双击右键**，一步到位。
+With this setup you just **select → double right-click**, in one step.
 
-**同一个手势还能翻历史**，两种情况它都不解读、改成直接弹出历史清单：
-按着 ⌥（Option）再触发；或者什么都没新复制、直接触发（剪贴板跟上次解读时一样）。
-想对同一段再解读一遍，清单顶上有「＋ 新对话（重读剪贴板）」。BTT 那边不用加任何东西。
+**The same gesture can also open history.** In two cases it opens the history list instead of explaining:
+when you trigger it while holding ⌥ (Option), or when you trigger it without copying anything new (the clipboard is the same as last time).
+To explain the same text again, use "＋ New chat (re-read clipboard)" at the top of the list. Nothing extra needs to be set up in BTT.
 
-## 四条命令管住它
+## Four commands to control it
 
 ```bash
-curl -s http://127.0.0.1:8823/explain   # 触发（BTT 绑的就是这条）
-curl -s http://127.0.0.1:8823/history   # 直接叫出历史清单（想再绑个手势的话）
-curl -s http://127.0.0.1:8823/reload    # 改完配置重新加载
-pkill -x Nutshell                       # 退出
+curl -s http://127.0.0.1:8823/explain   # trigger (this is what BTT is bound to)
+curl -s http://127.0.0.1:8823/history   # open the history list directly (if you want another gesture for it)
+curl -s http://127.0.0.1:8823/reload    # reload after editing the config
+pkill -x Nutshell                       # quit
 ```
 
-## 改 prompt / 换模型
+## Changing the prompt or the model
 
-配置文件在 `~/.config/nutshell/config.json`。
-改完打一下 `curl -s http://127.0.0.1:8823/reload`，**不用重新编译，也不用重启**。
+The config file is `~/.config/nutshell/config.json`.
+After editing it, run `curl -s http://127.0.0.1:8823/reload`. **No rebuild and no restart needed.**
 
-最常改的几个：
+The fields you will change most often:
 
 ```jsonc
 {
-  // 发给模型的话。{content} 会被替换成你复制的内容。
+  // What gets sent to the model. {content} is replaced with what you copied.
   "promptTemplate": "用通俗易懂的大白话讲一下下面讲的是什么东西：\n\n{content}\n\n用通俗易懂的大白话讲一下上面讲的是什么东西。",
 
-  // 复制的是图片时用这句（没有 {content}）
+  // Used when you copied an image (no {content})
   "imagePromptTemplate": "用通俗易懂的大白话讲一下这张图里讲的是什么东西。",
 
-  // 任何 OpenAI 兼容的 /chat/completions 都行：官方、自建网关、
-  // 公司内部代理、本机的 Ollama（http://localhost:11434/v1）
+  // Any OpenAI-compatible /chat/completions works: the official API, a self-hosted gateway,
+  // a company proxy, or a local Ollama (http://localhost:11434/v1)
   "baseURL": "https://api.openai.com/v1",
   "model": "gpt-5.4",
 
-  // 去 shell 环境里读哪个变量当 key（不想走环境变量就直接填 apiKey 字段）
+  // Which shell environment variable to read the key from (or put it directly in the apiKey field)
   "apiKeyEnvVar": "OPENAI_API_KEY"
 }
 ```
 
-看图那条要求模型支持多模态；纯文字的话什么模型都能跑。
+The default prompts are in Chinese ("explain what the following is about in plain, easy words"). Rewrite them in any language you like.
 
-**调 prompt 的快捷办法**（不用反复重启 app）：
+Explaining images requires a multimodal model. For text only, any model works.
 
-```bash
-./scripts/try-prompt.sh "要解读的内容"
-```
-
-它直接拿配置文件里的 prompt 和模型打一次网关，结果打在终端里，不经过 app。
-满意了再 `curl -s http://127.0.0.1:8823/reload` 让 app 生效。
-
-其余可调项：
-
-| 字段 | 作用 |
-|---|---|
-| `window.width` / `height` | 浮窗大小 |
-| `window.fontSize` | 正文字号 |
-| `window.gap` | 浮窗离鼠标多远 |
-| `port` | 触发端口，撞车了就换一个 |
-| `contextWindow` | 模型的上下文窗口有多大（token），默认 100 万。只用来在顶栏显示“这段对话用了多少 / 一共多少”，不截断任何内容，粘贴多少就发多少 |
-| `maxImages` | 一次最多带几张图 |
-| `maxScannedPDFPages` | 扫描版 PDF 最多看前几页 |
-| `showMenuBarIcon` | 默认 `false`。改成 `true` 会在菜单栏放个气泡图标，里面有打开配置/重载/退出 |
-| `systemPrompt` | 系统提示词，默认空。不管填没填，程序每次都会在它后面自动接一句当前时间（照 Gemini 官方格式："Current time is Wednesday, November 11, 2026 at 11:40 PM GMT+8."），免得模型把今年当成"未来"，这句不用自己写。想用 Gemini 官方提示词，可以从 [asgeirtj/system_prompts_leaks](https://github.com/asgeirtj/system_prompts_leaks/tree/main/Google) 抄身份和知识截止那几段，工具定义和越狱检测那几块别抄 |
-| `historyMenuCount` | 历史菜单里列几条，默认 30（磁盘上的对话一条都不会删） |
-| `rateLimitRetries` | 撞 429 自动重试几次，默认 6；填 0 就是不重试直接报错 |
-| `rateLimitRetryDelay` | 两次重试之间等几秒，默认 2 |
-
-API key 可以不写进配置文件：程序会 `source ~/.zshrc` 去读 `$OPENAI_API_KEY`（变量名按 `apiKeyEnvVar` 改），key 换了也能自动跟上（撞 401 会自动重读一次）。想写死也行，填 `apiKey` 字段。
-
-## 窗口怎么用
-
-- **再按一次快捷键** → 再开一扇新窗解读当前剪贴板，旧窗不动。窗口可以同时开好几扇，同一位置连着按会自动错开摆放，不会叠死
-- **⌘W** → 关一扇。开着好几扇时，关你点过的那扇，都没点过就关最新弹的——连着按就从上往下挨个收。浮窗露着脸的期间 ⌘W 归它——系统级热键直接截胡，后面的 Chrome / VS Code 压根收不到，tab 不会被误关；最后一扇一关，⌘W 立刻物归原主
-- 点右上角 **×**，或点过浮窗之后按 **Esc** → 关掉那一扇
-- 点窗口任意位置 → 光标自动进底部输入框，**可以接着追问**（多轮对话，它记得前面聊了什么）
-- 输入框**回车发送，Shift+回车换行**。平时只占一行，字多了或者粘一大段进来会自己撑高，最多撑到 8 行，再多就在框里滚。它还在回答的时候也能先把下一句打好，等答完再按回车
-- 输入框上面那根线**可以按住上下拖**，想要多高拖多高。双击那根线恢复成自动，发出一条消息之后也会恢复
-- 网断了、超时了、答到一半中断了 → 报错那行底下有个 **↻ 重试**，点一下把刚才那一问重新发一遍，不用再打一次。半截回答和报错会被清掉，不会留在对话里。关了窗从历史里翻出来，这个按钮还在
-- 回答里的数学公式会排成正经的公式（`$…$`、`$$…$$`、`\(…\)`、`\[…\]` 都认），不会露出一堆 `\frac` 和 `^`
-- 点右上角**复制图标** → 把整段回答拷走
-- 正文里划选一段 → **Cmd+C** 只拷这一段（输入框里 Cmd+V 粘贴、Cmd+A 全选、Cmd+Z 撤销也都能用）
-- 拖顶部那条 → 挪窗；拖边角 → 改大小
-- 窗口浮在最上层，但**不抢焦点**——弹出来的时候你原来那个 app 还是前台的
-
-## 终端版：在终端里跟 Gemini 纯聊天
-
-浮窗适合"看不懂、问一句"。要是想坐下来来回聊（讨论方案、磨一篇文章），用终端版：
+**A quick way to tune the prompt** (without restarting the app again and again):
 
 ```bash
-uv tool install --editable ./cli    # 装一次，之后哪个目录都能敲
-nutshell                            # 进入对话，也可以敲短的：nut
+./scripts/try-prompt.sh "text to explain"
 ```
 
-就是一问一答，没有工具、没有 agent，所以快。它跟浮窗共用同一份 `config.json`（网关、模型、`systemPrompt`），不用另配。
+It calls the gateway once with the prompt and model from the config file and prints the result in the terminal, without going through the app.
+Once you are happy, run `curl -s http://127.0.0.1:8823/reload` to apply it in the app.
 
-**整段对话原样留在终端里**：不开全屏界面、不清屏，打出去的内容只增不改。聊完 **Cmd+A 全选、复制**，就是完整的聊天记录，可以直接贴给 Claude 让它落盘成文件。要是终端的滚动历史不够长、前面的被顶掉了，敲 `/copyall` 一样能拿到完整记录（VS Code 终端默认只留 1000 行，可以把 `terminal.integrated.scrollback` 调大）。
+Other settings:
 
-回答里的 Markdown 会渲染好再显示：标题、加粗、列表、表格、代码高亮都是排好版的样子，不会看到一堆 `**` 和 `#`。一边收一边渲染，按段落来——正在收的那一段在最下面临时显示，收完一段就定稿一段。这样 Cmd+A 复制到的是排好版的文字；想要 Markdown 原文就用 `/copy`、`/copyall`。不想渲染的话，启动时加 `--raw`，或聊天中敲 `/raw` 开关。
-
-**拖东西进来**：把文件、图片、PDF、文件夹从访达或编辑器侧栏拖进终端，终端里显示的是它的路径，发出去时会在原位置换成内容——
-
-| 拖进来的 | 发给模型的 |
+| Field | What it does |
 |---|---|
-| 文字类文件（`.md`、代码、`.json`…） | 全文 |
-| 图片（PNG / JPG / HEIC / WebP…） | 图片本身，最长边压到 2048 像素 |
-| PDF | 整个原文件发过去，Gemini 自己把每一页当图看、同时读文字，全部页都发 |
-| Word / RTF | 转成纯文字 |
-| 文件夹 | 里面所有文件，按上面的规则逐个处理；在 git 仓库里会跳过 `.gitignore` 忽略的 |
+| `window.width` / `height` | Popup size |
+| `window.fontSize` | Body font size |
+| `window.gap` | Distance between the popup and the cursor |
+| `port` | Trigger port. Change it if something else is using it |
+| `contextWindow` | How large the model's context window is (in tokens), 1 million by default. Only used to show "used / total" in the title bar. Nothing is truncated: whatever you paste is sent in full |
+| `maxImages` | Maximum number of images per request |
+| `maxScannedPDFPages` | How many pages of a scanned PDF to look at |
+| `showMenuBarIcon` | `false` by default. Set to `true` to show a bubble icon in the menu bar with open config / reload / quit |
+| `systemPrompt` | System prompt, empty by default. Whether or not you fill it in, the app always appends the current time after it (in Gemini's official format: "Current time is Wednesday, November 11, 2026 at 11:40 PM GMT+8."), so the model doesn't treat the current year as "the future". You don't need to write that line yourself. If you want Gemini's official system prompt, you can copy the identity and knowledge-cutoff parts from [asgeirtj/system_prompts_leaks](https://github.com/asgeirtj/system_prompts_leaks/tree/main/Google). Skip the tool definitions and jailbreak-detection parts |
+| `historyMenuCount` | How many entries the history menu lists, 30 by default (no conversation on disk is ever deleted) |
+| `rateLimitRetries` | How many times to retry on a 429, 6 by default. 0 means report the error right away |
+| `rateLimitRetryDelay` | Seconds to wait between retries, 2 by default |
 
-一条消息里可以拖好几样，也可以边打字边拖。附件特别大（超过 20 万 token 或 60 张图）会先问一句再发。因为终端里留的是路径，把聊天记录贴给 Claude 之后，它也能照着路径自己去读那些文件。
+You don't have to put the API key in the config file: the app runs `source ~/.zshrc` to read `$OPENAI_API_KEY` (change the variable name with `apiKeyEnvVar`), and it picks up a changed key automatically (a 401 triggers one re-read). If you prefer to hard-code it, fill in the `apiKey` field.
 
-**换后端**：默认走默认网关。公司的 key 被批量任务占满时，切到自己的 Google AI Studio key——
+## Using the window
+
+- **Press the shortcut again** → another new window explains the current clipboard, and the old one stays. You can have several windows at once. Pressing repeatedly at the same spot staggers them so they don't stack exactly on top of each other
+- **⌘W** → closes one. With several open, it closes the one you last clicked, or the newest one if you haven't clicked any, so pressing it repeatedly closes them from the top down. While a popup is visible, ⌘W belongs to it: a system-wide hotkey takes it first, so Chrome / VS Code behind it never receive it and no tab gets closed by mistake. As soon as the last popup closes, ⌘W goes back to normal
+- Click the **×** in the top-right, or press **Esc** after clicking the popup → closes that window
+- Click anywhere in the window → the cursor jumps to the input box at the bottom, and **you can ask follow-ups** (multi-turn, it remembers what was said)
+- In the input box, **Return sends, Shift+Return adds a new line**. It normally takes one line. When you type more or paste a big chunk, it grows on its own up to 8 lines, then scrolls inside. You can type your next message while it is still answering, and press Return once it is done
+- The line above the input box **can be dragged up and down** to any height you like. Double-click the line to go back to automatic, which also happens after you send a message
+- Network dropped, timed out, or the answer broke off halfway → a **↻ Retry** button appears below the error. Click it to resend the last question without typing it again. The partial answer and the error are cleared and don't stay in the conversation. The button is still there if you close the window and reopen it from history
+- Math formulas in answers are typeset properly (`$…$`, `$$…$$`, `\(…\)` and `\[…\]` are all recognized), instead of showing raw `\frac` and `^`
+- Click the **copy icon** in the top-right → copies the whole answer
+- Select part of the body text → **Cmd+C** copies just that part (Cmd+V paste, Cmd+A select all and Cmd+Z undo also work in the input box)
+- Drag the top bar → move the window. Drag the edges → resize it
+- The window floats on top but **doesn't steal focus**: when it pops up, your original app stays in front
+
+## Terminal version: plain chat with Gemini in the terminal
+
+The popup is good for "I don't get this, quick question". If you want to sit down and go back and forth (discussing a plan, polishing an article), use the terminal version:
 
 ```bash
-nutshell --own      # 启动时就走自己的 key
+uv tool install --editable ./cli    # install once, then use it from any directory
+nutshell                            # start chatting, or use the short form: nut
 ```
 
-聊到一半也能切：敲 `/own` 切过去，`/work` 切回来，对话不断。自己的 key 在 [AI Studio](https://aistudio.google.com/api-keys) 建好后，写进仓库根目录的 `.env`（这个文件不进 git）：
+It's just question and answer, no tools and no agent, so it's fast. It shares the same `config.json` with the popup (gateway, model, `systemPrompt`), so there is nothing extra to configure.
 
-```
-GEMINI_AI_STUDIO_KEY_NUTSHELL='你的key'
-```
+**The whole conversation stays in the terminal as is**: no full-screen UI, no screen clearing, output is only appended, never rewritten. When you are done, **Cmd+A to select all and copy**, and you have the complete chat log, ready to paste to Claude to save as a file. If the terminal's scrollback is too short and the beginning has been pushed out, type `/copyall` to get the complete log anyway (the VS Code terminal keeps only 1000 lines by default; raise `terminal.integrated.scrollback`).
 
-| 命令 | 作用 |
+Markdown in answers is rendered before it is shown: headings, bold, lists, tables and code highlighting are laid out properly, so you don't see a pile of `**` and `#`. Rendering happens while the answer streams in, paragraph by paragraph: the paragraph being received is shown temporarily at the bottom, and each paragraph is finalized once it is complete. That way Cmd+A copies the formatted text. For the raw Markdown, use `/copy` or `/copyall`. To turn rendering off, start with `--raw`, or type `/raw` during a chat to toggle it.
+
+**Dragging things in**: drag files, images, PDFs or folders from Finder or your editor's sidebar into the terminal. The terminal shows the path, and when the message is sent, the path is replaced in place with the content:
+
+| What you drag in | What the model gets |
 |---|---|
-| `/own`、`/work` | 切到自己的 key / 切回默认网关 |
-| `/model 名字` | 换模型 |
-| `/models` | 列出当前这把 key 能用的 Gemini 模型 |
-| `/copy` | 复制上一条回答（Markdown 原文） |
-| `/copyall` | 复制整段聊天记录（Markdown 原文） |
-| `/raw` | 开关 Markdown 渲染，关掉后回答按原样打纯文字 |
-| `/new` | 开一段新对话 |
-| `/resume` | 列出以前的对话，上下键挑一段接着聊 |
-| `/exit`、Ctrl+D 或连按两次 Ctrl+C | 退出 |
+| Text files (`.md`, code, `.json`…) | The full text |
+| Images (PNG / JPG / HEIC / WebP…) | The image itself, with the longest side scaled down to 2048 pixels |
+| PDF | The whole original file. Gemini looks at every page as an image and reads the text at the same time. All pages are sent |
+| Word / RTF | Converted to plain text |
+| Folders | Every file inside, each handled by the rules above. Inside a git repository, files ignored by `.gitignore` are skipped |
 
-回车发送，**Option+回车**（或先按 Esc 再按回车）换行，粘贴多行不会被拆开发。等回答时按 Ctrl+C 可以打断。`nutshell -p "一句话"` 只问一句、打印回答就退出。
+One message can include several attachments, and you can type and drag at the same time. If the attachments are very large (over 200,000 tokens or 60 images), it asks before sending. Because the terminal keeps the paths, after you paste the chat log to Claude, it can read those files itself by following the paths.
 
-**接着以前的对话聊**：每收完一条回答就自动存盘（存在 `~/.config/nutshell/chats/`），所以随时退出、甚至直接关掉终端都不会丢。退出时会打出一行 `接着聊：nutshell -r 编号`，照着敲就回到这段对话。不记得编号就敲 `nutshell -r`（或聊天中敲 `/resume`），会列出最近的对话，上下键选、回车确定；`nutshell -c` 直接接最近的那一段。接上以后会把之前的问答重新打一遍，终端里还是完整的记录。
+**Switching backends**: by default it uses the gateway in `config.json`. When that key is saturated by batch jobs, switch to your own Google AI Studio key:
 
-列表里每段对话的标题是模型自动起的：聊完头几轮在后台悄悄起好，不耽误你接着聊；以前没标题的旧对话，第一次列出来时会一口气补上。起标题用的 prompt 是 `cli/nutshell_cli/main.py` 顶部的 `TITLE_PROMPT`，想改措辞改那里。
+```bash
+nutshell --own      # use your own key from the start
+```
 
-## 为什么要常驻后台
+You can also switch mid-chat: type `/own` to switch over and `/work` to switch back, without losing the conversation. Create your key in [AI Studio](https://aistudio.google.com/api-keys), then put it in `.env` at the repository root (this file is not committed):
 
-因为要快。如果每次按快捷键才现启动程序、现建窗口，按下去到看见窗至少半秒到一秒起步——那还没开始等模型呢。常驻着就是按下即出。
+```
+GEMINI_AI_STUDIO_KEY_NUTSHELL='your key'
+```
 
-## 排查
+| Command | What it does |
+|---|---|
+| `/own`, `/work` | Switch to your own key / back to the gateway |
+| `/model name` | Change model |
+| `/models` | List the Gemini models the current key can use |
+| `/copy` | Copy the last answer (raw Markdown) |
+| `/copyall` | Copy the whole chat log (raw Markdown) |
+| `/raw` | Toggle Markdown rendering. When off, answers are printed as plain text |
+| `/new` | Start a new conversation |
+| `/resume` | List earlier conversations and pick one with the arrow keys to continue |
+| `/exit`, Ctrl+D or Ctrl+C twice | Quit |
 
-**按了没反应**：先确认进程在不在，再确认端口是不是它在听：
+Return sends, **Option+Return** (or Esc then Return) adds a new line, and pasting multiple lines doesn't split them into separate messages. Press Ctrl+C while waiting for an answer to interrupt it. `nutshell -p "one question"` asks a single question, prints the answer and exits.
+
+**Continuing earlier conversations**: every answer is saved as soon as it is received (under `~/.config/nutshell/chats/`), so you can quit at any time, or even just close the terminal, without losing anything. On exit it prints a line like `接着聊：nutshell -r <id>` ("continue: …"); type it to return to that conversation. If you don't remember the id, type `nutshell -r` (or `/resume` during a chat) to list recent conversations, pick one with the arrow keys and press Return. `nutshell -c` continues the most recent one directly. After resuming, the earlier questions and answers are printed again, so the terminal still holds the complete log.
+
+Each conversation in the list gets a title written by the model: it is generated quietly in the background after the first few rounds, without holding up your chat. Older conversations without a title get one all at once the first time they are listed. The prompt used for titles is `TITLE_PROMPT` at the top of `cli/nutshell_cli/main.py`. Change the wording there.
+
+## Why it stays in the background
+
+Because it needs to be fast. If the app had to start and build its window only after you pressed the shortcut, it would take at least half a second to a second before you saw anything, and that is before the model even starts. Staying resident means it appears the moment you press.
+
+## Troubleshooting
+
+**Nothing happens when I press it**: first check that the process is running, then that it is the one listening on the port:
 
 ```bash
 pgrep -x Nutshell && lsof -nP -iTCP:8823 -sTCP:LISTEN
 ```
 
-端口要是被别的程序占了，Nutshell 会直接弹框告诉你（不会闷声不响）。换个 `port` 即可。
+If the port is taken by another program, Nutshell shows a dialog telling you so (it doesn't fail silently). Just change `port`.
 
-**说找不到 API key**：
+**It says it can't find the API key**:
 
 ```bash
 source ~/.zshrc && echo ${OPENAI_API_KEY: -4}
 ```
 
-有值就正常。没值说明 key 没配好，或者不在 `~/.zshrc` 这条链路上。
+If something is printed, you are fine. If not, the key isn't set up, or it isn't reachable through `~/.zshrc`.
 
-**撞 429 被限流**：不用管，它自己会重试——每 2 秒一次，最多 6 次，窗里会显示第几次。
+**Rate-limited with a 429**: nothing to do, it retries on its own, once every 2 seconds, up to 6 times, and the window shows which attempt it is on.
 
-429 常见的那句 `Limit type: max_parallel_requests. Current limit: 2` 说的不是「你按太快了」，
-而是**这个 key 同一时刻能跑几个请求**已经占满了——多半是你在别处跑着批量任务，
-或者这个 key 是跟别人共用的。这种水位几秒就松，所以等着就行。
-真要等不及，改 `rateLimitRetries` 和 `rateLimitRetryDelay`。
+The common 429 message `Limit type: max_parallel_requests. Current limit: 2` doesn't mean "you pressed too fast".
+It means **the number of requests this key can run at the same time** is used up, most likely because you are running batch jobs elsewhere,
+or the key is shared with other people. That kind of limit frees up within seconds, so just wait.
+If you really can't wait, change `rateLimitRetries` and `rateLimitRetryDelay`.
 
-## 目录
+## Layout
 
 ```
-Sources/Nutshell/       浮窗版（Swift）
-  main.swift            启动，注册成不进 Dock 的后台程序
-  AppDelegate.swift     总调度：触发、对话历史、可选的菜单栏图标
-  TriggerServer.swift   听 127.0.0.1:8823，BTT 用 curl 叫醒它
-  CloseHotKey.swift     有窗开着时接管 ⌘W
-  InputCapture.swift    看剪贴板里是文字/PDF/图片/文件，分别处理
-  ExplainWindowController.swift  一扇窗里的一段对话：发问、追问、重试、存档
-  LLMClient.swift       调网关，SSE 流式收字
-  PopoverPanel.swift    浮窗本体 + 自适应定位 + 底部打字区的布局
-  ComposerViews.swift   打字区的两个零件：会自己长高的输入框、能拖的分隔线
-  MarkdownView.swift    WKWebView 壳，负责渲染
-  SessionStore.swift    对话历史落盘（一次对话一个 JSON，只增不删）
-  Config.swift          配置读写（prompt 常量在文件顶部）
+Sources/Nutshell/       Popup version (Swift)
+  main.swift            Startup, registers as a background app without a Dock icon
+  AppDelegate.swift     Coordinator: triggers, chat history, optional menu bar icon
+  TriggerServer.swift   Listens on 127.0.0.1:8823, BTT wakes it up with curl
+  CloseHotKey.swift     Takes over ⌘W while a window is open
+  InputCapture.swift    Figures out whether the clipboard holds text/PDF/images/files and handles each
+  ExplainWindowController.swift  One conversation in one window: ask, follow up, retry, save
+  LLMClient.swift       Calls the gateway, receives text over SSE streaming
+  PopoverPanel.swift    The popup itself + adaptive positioning + layout of the input area at the bottom
+  ComposerViews.swift   Two parts of the input area: the self-growing input box and the draggable divider
+  MarkdownView.swift    WKWebView wrapper, handles rendering
+  SessionStore.swift    Saves chat history to disk (one JSON per conversation, append only)
+  Config.swift          Reads and writes the config (prompt constants at the top of the file)
   Resources/
-    viewer.html         渲染页（样式、思考动画、自动滚动、重试按钮）
-    marked.min.js       markdown 解析库，内嵌进 app，不联网
-    katex.min.js        数学公式排版库 KaTeX，内嵌进 app，不联网
-    katex.inline.min.css  KaTeX 的样式，字体已转成 base64 写在里面
-Tests/NutshellTests/    浮窗版的自动化测试，`make test` 跑，不弹窗不联网
-scripts/                开发用的辅助脚本
-  explain_repo.py       给每个文件生成通俗解读（放在 docs/explain/，不进 git）
-  try-prompt.sh         不开 app，在终端里单独试 prompt
-  make_icon.py          把 icon/AppIcon-source.png 抠掉底色，打成 app 图标
-  vendor_katex.py       升级 KaTeX 时用：拉新版、把字体塞进 CSS
-icon/                   app 图标的原图和成品
-cli/nutshell_cli/       终端版（Python，uv 装）
-  main.py               对话循环、命令、两个后端、流式打字
-  attach.py             认出拖进来的路径，换成文件内容 / 图片 / PDF 原文件
-  render.py             把回答里的 Markdown 一段一段渲染到终端
+    viewer.html         The rendering page (styles, thinking animation, auto-scroll, retry button)
+    marked.min.js       Markdown parser, bundled into the app, works offline
+    katex.min.js        KaTeX math typesetting library, bundled into the app, works offline
+    katex.inline.min.css  KaTeX styles, with the fonts embedded as base64
+Tests/NutshellTests/    Automated tests for the popup version, run with `make test`, no windows shown, no network
+scripts/                Development helper scripts
+  explain_repo.py       Generates a plain-language explanation for every file (in docs/explain/, not committed)
+  try-prompt.sh         Tries a prompt in the terminal without opening the app
+  make_icon.py          Cuts the solid background out of icon/AppIcon-source.png and builds the app icon
+  vendor_katex.py       For upgrading KaTeX: fetches a new version and embeds the fonts into the CSS
+icon/                   Source image and finished app icon
+cli/nutshell_cli/       Terminal version (Python, installed with uv)
+  main.py               Chat loop, commands, the two backends, streaming output
+  attach.py             Recognizes dragged-in paths and replaces them with file contents / images / original PDFs
+  render.py             Renders Markdown in answers to the terminal paragraph by paragraph
 ```
 
 ## License
 
-MIT，随便用。
+MIT. Use it however you like.
