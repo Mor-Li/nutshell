@@ -217,6 +217,7 @@ nutshell                            # or: nut
 - Answers are rendered as Markdown while they stream. The whole chat stays in your scrollback, so ⌘A + copy gives you the full log (`/copyall` gets the raw Markdown)
 - **Drag files in**: text files are inlined, images are attached, PDFs are sent whole, folders are expanded (respecting `.gitignore`)
 - Every answer is saved. `nutshell -r` lists past chats with auto-generated titles, `nutshell -c` continues the latest one
+- The gateway address and key come from `LITELLM_BASE_URL` and `LITELLM_API_KEY`, either in your environment or in a `.env` file at the repo root (copy `.env.example`)
 - `--own` / `/own` switches to your own Google AI Studio key (`GEMINI_AI_STUDIO_KEY_NUTSHELL` in `.env`), `/work` switches back
 
 | Command | What it does |

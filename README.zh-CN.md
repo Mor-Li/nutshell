@@ -216,6 +216,7 @@ nutshell                            # 或者敲短的：nut
 - 回答一边收一边按 Markdown 排好版。整段对话都留在终端里，⌘A 复制就是完整记录（`/copyall` 拿 Markdown 原文）
 - **拖文件进来**：文字文件贴全文，图片作为附件，PDF 整个发过去，文件夹逐个展开（跳过 `.gitignore` 忽略的）
 - 每条回答都自动存盘。`nutshell -r` 列出以前的对话（标题是模型自动起的），`nutshell -c` 接着最近那段
+- 网关地址和密钥从 `LITELLM_BASE_URL`、`LITELLM_API_KEY` 读，可以设成环境变量，也可以写进仓库根目录的 `.env`（照 `.env.example` 填）
 - `--own` 或 `/own` 切到自己的 Google AI Studio key（写在 `.env` 的 `GEMINI_AI_STUDIO_KEY_NUTSHELL`），`/work` 切回来
 
 | 命令 | 作用 |

@@ -6,8 +6,9 @@
 `--raw` 或聊天中 `/raw` 可以改回原样打纯文字。拖进来的文件在终端里显示的是完整路径，
 Claude 拿到记录也能自己去读。
 
-后端默认走默认网关（跟 Nutshell 浮窗共用 ~/.config/nutshell/config.json 里的网关、
-模型和 systemPrompt）；`--own` 或聊天中 `/own` 切到自己的 Google AI Studio key。
+后端默认走你配的 OpenAI 兼容网关：地址和 key 从环境变量 LITELLM_BASE_URL、LITELLM_API_KEY
+读，没有就读仓库根目录的 .env（照 .env.example 填）。模型和 systemPrompt 跟 Nutshell 浮窗共用
+~/.config/nutshell/config.json。`--own` 或聊天中 `/own` 切到自己的 Google AI Studio key。
 """
 
 from __future__ import annotations
@@ -33,6 +34,9 @@ HISTORY_PATH = CONFIG_DIR / "cli_history"
 GOOGLE_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 #: 自己的 Google AI Studio key 叫这个名字，写在仓库根目录的 .env 里（.env 不进 git）
 OWN_KEY_ENV = "GEMINI_AI_STUDIO_KEY_NUTSHELL"
+#: 默认后端（OpenAI 兼容网关）的地址和 key，同样先看环境变量，再看 .env
+GATEWAY_URL_ENV = "LITELLM_BASE_URL"
+GATEWAY_KEY_ENV = "LITELLM_API_KEY"
 #: 这个包是 editable 装的，所以顺着文件位置往上两层就是仓库根目录
 DOTENV_PATH = Path(__file__).resolve().parents[2] / ".env"
 
@@ -82,7 +86,7 @@ def load_config() -> dict:
     config = {
         "baseURL": "https://api.openai.com/v1",
         "model": "gemini-4-argon",
-        "apiKeyEnvVar": "LITELLM_API_KEY",
+        "apiKeyEnvVar": GATEWAY_KEY_ENV,
         "apiKey": "",
         "systemPrompt": "",
         "maxTokens": 32768,
@@ -90,6 +94,10 @@ def load_config() -> dict:
     }
     if CONFIG_PATH.exists():
         config.update(json.loads(CONFIG_PATH.read_text()))
+    # 网关地址以环境变量 / .env 为准，这样地址不用写进任何会进 git 的文件
+    url = os.environ.get(GATEWAY_URL_ENV) or read_dotenv().get(GATEWAY_URL_ENV)
+    if url:
+        config["baseURL"] = url
     return config
 
 
@@ -643,7 +651,7 @@ def main() -> None:
         prog="nutshell",
         description="在终端里跟 Gemini 纯聊天。拖文件、图片、PDF、文件夹进来，内容原地附上。",
     )
-    parser.add_argument("--own", action="store_true", help=f"走自己的 Google AI Studio key（仓库 .env 里的 {OWN_KEY_ENV}），默认走默认网关")
+    parser.add_argument("--own", action="store_true", help=f"走自己的 Google AI Studio key（仓库 .env 里的 {OWN_KEY_ENV}），默认走 LITELLM_BASE_URL 那个网关")
     parser.add_argument("-m", "--model", help="模型名，默认用 Nutshell 配置里的")
     parser.add_argument("-c", "--continue", dest="latest", action="store_true", help="接着最近的那段对话聊")
     parser.add_argument("-r", "--resume", nargs="?", const="", metavar="编号", help="接着以前的某段对话聊：不带编号就列出来让你挑，带编号直接接上")
