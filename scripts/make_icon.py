@@ -1,57 +1,76 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["pillow", "numpy"]
+# dependencies = ["pillow", "numpy", "scipy"]
 # ///
-"""把 icon/AppIcon-source.png（正方形图案，没有圆角）做成 macOS 的 app 图标。
+"""把 icon/AppIcon-source.png 做成 macOS 的 app 图标。
 
-做法照 macOS 图标模板：1024 的画布，图案缩到 824 居中，切成苹果那种过渡平滑的圆角方形
-（超椭圆，圆角约占边长 22.5%），四周透明，底下垫一点淡阴影。再导出各个尺寸，用系统自带的
-iconutil 打成 icon/AppIcon.icns，`make app` 会把它放进 app。
+原图是纯色底上画着一个图案。这里把纯色底抠掉，只留图案本身，四周透明，
+不套 macOS 常见的那种圆角方块底板（用户 2026-11-21 不要外面那一圈框）。
+底色取自原图四个角。抠完把图案缩到 1024 画布里居中，垫一点很淡的投影，
+再导出各个尺寸，用系统自带的 iconutil 打成 icon/AppIcon.icns，`make app` 会把它放进 app。
 
-换图标：把新的正方形图案存成 icon/AppIcon-source.png，然后
+换图标：把新的图案（纯色底、图案和底色反差够大）存成 icon/AppIcon-source.png，然后
     uv run scripts/make_icon.py
 """
 
-import shutil
 import subprocess
 import tempfile
 from pathlib import Path
 
 import numpy as np
 from PIL import Image, ImageFilter
+from scipy import ndimage
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCE = ROOT / "icon" / "AppIcon-source.png"
 OUT_PNG = ROOT / "icon" / "AppIcon.png"
 OUT_ICNS = ROOT / "icon" / "AppIcon.icns"
 
-CANVAS, BODY = 1024, 824
+CANVAS = 1024
+BODY = 900          # 图案最长边占多少，四周留一点给投影
+THRESHOLD = 25      # 跟底色的颜色差超过这个就算图案
 
 
-def squircle_mask(size: int, n: float = 5.0) -> Image.Image:
-    """超椭圆 |x|^n + |y|^n <= 1，n=5 跟苹果图标的圆角很接近。先画 4 倍大再缩，边缘不起锯齿"""
-    big = size * 4
-    t = np.linspace(-1, 1, big)
-    x, y = np.meshgrid(t, t)
-    inside = (np.abs(x) ** n + np.abs(y) ** n) <= 1
-    return Image.fromarray((inside * 255).astype(np.uint8)).resize((size, size), Image.LANCZOS)
+def cut_out(path: Path) -> Image.Image:
+    rgb = np.asarray(Image.open(path).convert("RGB")).astype(np.float32)
+    h, w, _ = rgb.shape
+    k = max(8, h // 100)
+    bg = np.concatenate([rgb[:k, :k], rgb[:k, -k:], rgb[-k:, :k], rgb[-k:, -k:]]).reshape(-1, 3).mean(0)
+
+    dist = np.linalg.norm(rgb - bg, axis=2)
+    mask = dist > THRESHOLD
+    # 去掉零星噪点，只留够大的几块（果子和气泡），再把块里的洞补上
+    labels, n = ndimage.label(mask)
+    sizes = ndimage.sum(mask, labels, range(1, n + 1))
+    mask = np.isin(labels, 1 + np.flatnonzero(sizes > mask.size * 0.002))
+    mask = ndimage.binary_fill_holes(mask)
+
+    # 边缘柔化防锯齿，半透明的边上把混进去的底色减掉，不然白气泡会有一圈棕边
+    alpha = np.asarray(Image.fromarray((mask * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(2))) / 255.0
+    a = np.clip(alpha, 1e-3, 1)[..., None]
+    fg = np.clip((rgb - (1 - a) * bg) / a, 0, 255)
+    rgba = np.dstack([fg, alpha * 255]).astype(np.uint8)
+
+    ys, xs = np.nonzero(alpha > 0.01)
+    return Image.fromarray(rgba, "RGBA").crop((xs.min(), ys.min(), xs.max() + 1, ys.max() + 1))
 
 
 def main():
-    art = Image.open(SOURCE).convert("RGBA").resize((BODY, BODY), Image.LANCZOS)
-    mask = squircle_mask(BODY)
-    art.putalpha(mask)
+    art = cut_out(SOURCE)
+    scale = BODY / max(art.size)
+    art = art.resize((round(art.width * scale), round(art.height * scale)), Image.LANCZOS)
 
     canvas = Image.new("RGBA", (CANVAS, CANVAS), (0, 0, 0, 0))
-    offset = (CANVAS - BODY) // 2
+    offset = ((CANVAS - art.width) // 2, (CANVAS - art.height) // 2)
 
+    # 投影跟着图案的形状走，不是方块
     shadow = Image.new("RGBA", (CANVAS, CANVAS), (0, 0, 0, 0))
-    shadow_body = Image.new("RGBA", (BODY, BODY), (0, 0, 0, 90))
-    shadow_body.putalpha(mask.point(lambda v: v * 90 // 255))
-    shadow.paste(shadow_body, (offset, offset + 10), shadow_body)
-    canvas = Image.alpha_composite(canvas, shadow.filter(ImageFilter.GaussianBlur(14)))
+    silhouette = Image.new("RGBA", art.size, (0, 0, 0, 0))
+    silhouette.putalpha(art.getchannel("A").point(lambda v: v * 70 // 255))
+    shadow.paste(silhouette, (offset[0], offset[1] + 10), silhouette)
+    canvas = Image.alpha_composite(canvas, shadow.filter(ImageFilter.GaussianBlur(12)))
 
-    canvas.paste(art, (offset, offset), art)
+    canvas.paste(art, offset, art)
     canvas.save(OUT_PNG)
 
     with tempfile.TemporaryDirectory() as tmp:

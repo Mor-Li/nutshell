@@ -11,11 +11,11 @@ macOS 上的浮窗小工具。复制点东西、按一下快捷键，鼠标旁�
 | 位置 | 放什么 |
 |---|---|
 | `Sources/Nutshell/` | 浮窗版的全部 Swift 源码，一个文件管一件事，分工见下一节 |
-| `Sources/Nutshell/Resources/` | 浮窗里显示正文的那张网页 `viewer.html`，和它用的 Markdown 解析库。打包时原样带进 app |
+| `Sources/Nutshell/Resources/` | 浮窗里显示正文的那张网页 `viewer.html`，和它用的 Markdown 解析库 `marked.min.js`、数学公式排版库 KaTeX（`katex.min.js` 和字体已内联的 `katex.inline.min.css`）。打包时原样带进 app，加载时全部内联进网页，不联网 |
 | `Tests/NutshellTests/` | 浮窗版的自动化测试。不弹窗、不联网，模型接口是假的 |
 | `cli/` | 终端版。`cli/nutshell_cli/` 是源码，`pyproject.toml` 和 `uv.lock` 是依赖声明 |
-| `icon/` | app 图标。`AppIcon-source.png` 是没切圆角的正方形图案（2026-11-20 用 GPT Image 2.5 生成：裂开的榛子里冒出一个对话气泡），`AppIcon.png` 和 `AppIcon.icns` 由 `scripts/make_icon.py` 生成，`make app` 把 icns 放进 app |
-| `scripts/` | 开发时用的辅助脚本，不随 app 发布。`explain_repo.py` 生成代码解读和本文件末尾的地图，`try-prompt.sh` 在终端里单独试 prompt，`make_icon.py` 把 `icon/AppIcon-source.png` 切成 macOS 图标形状并打成 icns（`uv run scripts/make_icon.py`） |
+| `icon/` | app 图标。`AppIcon-source.png` 是纯棕色底上的扁平风图案（2026-11-20 用 GPT Image 2.5 生成：裂开的榛子里冒出一个对话气泡），`AppIcon.png` 和 `AppIcon.icns` 由 `scripts/make_icon.py` 生成，`make app` 把 icns 放进 app。用户不要图标外面那圈圆角方块底板（2026-11-21），所以脚本把底色抠掉，只留图案本身。之前那版写实风的原图在提交 8127efc 里 |
+| `scripts/` | 开发时用的辅助脚本，不随 app 发布。`explain_repo.py` 生成代码解读和本文件末尾的地图，`try-prompt.sh` 在终端里单独试 prompt，`make_icon.py` 把 `icon/AppIcon-source.png` 的纯色底抠掉、只留图案，打成 icns（`uv run scripts/make_icon.py`），`vendor_katex.py` 拉 KaTeX 并把字体转成 base64 写进 CSS（`uv run scripts/vendor_katex.py [版本号]`，升级 KaTeX 时用） |
 | `docs/explain/` | `explain_repo.py` 生成的逐文件、逐目录通俗解读，给人翻阅用。里面的层级照搬仓库本身。不进 git |
 | 根目录 | `Package.swift` 是构建配置，`Info.plist` 是 app 的身份信息，`Makefile` 是打包安装命令，`README.md` 是给人看的使用说明，`AGENTS.md` 是本文件，`.env` 放终端版直连 Gemini 用的密钥（不进 git） |
 | `.build/` 和 `build/` | 构建产物，前者是 SwiftPM 的中间文件，后者是打好的 `Nutshell.app`。都不进 git，随时可删 |
@@ -67,6 +67,7 @@ macOS 上的浮窗小工具。复制点东西、按一下快捷键，鼠标旁�
 - 说明文件只有 `AGENTS.md` 这一份，不建 `CLAUDE.md`。
 - 下面「仓库代码地图」一节由 `scripts/explain_repo.py` 自动维护，不要手工编辑，下次跑会整段覆盖。标题也不要改，改了脚本会在文件末尾另起一份。
 - 不要去改正文那块网页视图的大小来配合底部打字区。网页视图固定从顶栏铺到窗口底，被打字区盖住的一截由 `MarkdownView` 裁掉，再用 `nsBottomInset` 告诉页面底部让出多高。直接改大小的做法出过毛病：分隔线往下拖回去之后，线上面会留一块空白不画。`TranscriptInsetTests.swift` 守着这条。
+- 数学公式在 `viewer.html` 里靠两个 marked 扩展认出来（`mathBlock` 和 `mathInline`），认的是 `$…$`、`$$…$$`、`\(…\)`、`\[…\]` 四种写法。公式必须在 marked 解析时整段截下来交给 KaTeX，不能等 marked 出完 HTML 再找，那时 `\\` 已经被吃成 `\`、`_x_` 已经变成斜体。单个 `$` 的规则是为了躲开钱数（"$5 到 $10"），改它之前先跑 `MathRenderingTests.swift`。
 - 浮窗正文里有两种给程序看的记号，改动时两边要一起改。`<!--ns-user-->` 包着用户说的话，网页据此画成气泡。`<!--ns-failed-->` 贴在正文末尾，表示最后一轮没答成，网页据此显示「重试」按钮。写记号的是 `ExplainWindowController.swift`，认记号的是 `viewer.html`。
 
 ## 仓库代码地图
