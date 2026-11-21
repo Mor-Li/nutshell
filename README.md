@@ -1,60 +1,146 @@
-# Nutshell
+<div align="center">
+  <p>
+    <img width="100%" src="assets/banner-en.png" alt="Nutshell: copy anything you don't get, get it in plain words right by your cursor">
+  </p>
 
-**English** | [中文](README.zh-CN.md)
+**English** | [简体中文](README.zh-CN.md)
 
-Select → copy → press once → a small window pops up next to your cursor and explains, in plain words, what you just copied.
+<div>
+  <a href="https://github.com/Mor-Li/nutshell/releases/latest"><img src="https://img.shields.io/github/v/release/Mor-Li/nutshell?label=release&color=a5573a" alt="Latest release"></a>
+  <img src="https://img.shields.io/badge/macOS-14%2B-111111?logo=apple&logoColor=white" alt="macOS 14+">
+  <img src="https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white" alt="Swift 6">
+  <img src="https://img.shields.io/badge/any%20OpenAI--compatible%20API-supported-412991?logo=openai&logoColor=white" alt="Any OpenAI-compatible API">
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/Mor-Li/nutshell?color=2f9e44" alt="MIT License"></a>
+  <a href="https://github.com/Mor-Li/nutshell/commits/main"><img src="https://img.shields.io/github/last-commit/Mor-Li/nutshell?color=6c757d" alt="Last commit"></a>
+  <a href="https://github.com/Mor-Li/nutshell/stargazers"><img src="https://img.shields.io/github/stars/Mor-Li/nutshell?style=social" alt="GitHub stars"></a>
+</div>
+</div>
+<br>
 
-Every press opens a **new** window, and you can keep several open at once: one explaining a paragraph of a paper, another explaining an error message you copied a moment later, side by side for comparison. When you are done, close them one by one with × (or ⌘W / Esc).
+**Nutshell** is a tiny macOS helper for the moments you're reading something you can't quite follow: a dense paper, a wall of technical docs, a cryptic error, a confusing email. Select it, copy it, double-tap the trackpad with two fingers, and a small window pops up **right next to your cursor** explaining it in plain words. No switching to a browser, no pasting into a chat site, no losing your place.
 
-The name comes from the English idiom *in a nutshell*.
+<p align="center">
+  <img width="100%" src="assets/nutshell-demo-en.gif" alt="Demo: select all, copy, two-finger double-tap, and Nutshell explains the paper in plain words">
+</p>
 
----
+## ✨ Highlights
 
-## News
+<table>
+  <tr>
+    <td width="50%" valign="top">⚡ <b>Instant</b><br>Stays resident in the background, so the window appears the moment you trigger it. It never steals focus from the app you're reading in.</td>
+    <td width="50%" valign="top">📎 <b>Feed it anything</b><br>Text, PDFs (scanned ones too), screenshots and images, Word / RTF / HTML, source code, several files at once.</td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">💬 <b>Keep asking</b><br>Every window is a conversation. Type a follow-up at the bottom and it remembers what was said.</td>
+    <td width="50%" valign="top">🪟 <b>Many windows at once</b><br>Every trigger opens a new window. Explain a paper here and an error message there, side by side.</td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">🗂 <b>Nothing is lost</b><br>Every round is saved automatically. Jump back to any earlier conversation from the clock menu, context and images included.</td>
+    <td width="50%" valign="top">🧮 <b>Math that reads like math</b><br><code>$…$</code>, <code>$$…$$</code>, <code>\(…\)</code> and <code>\[…\]</code> are typeset with KaTeX, fully offline. Prices like "$5 to $10" stay plain text.</td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">🔌 <b>Your model, your key</b><br>Any OpenAI-compatible <code>/chat/completions</code> endpoint: OpenAI, Gemini, a company gateway, or a local Ollama.</td>
+    <td width="50%" valign="top">🖥 <b>Terminal version too</b><br>A fast, no-agent chat in your terminal that shares the same config. Drag files in to attach them.</td>
+  </tr>
+</table>
 
-- **2026-11-21** Math rendering in the popup: `$…$`, `$$…$$`, `\(…\)` and `\[…\]` are all typeset, while prices ("$5 to $10") and `$` inside code stay as plain text. Works offline, with the library and fonts bundled into the app. New flat-style icon, without the rounded-square frame around it.
-- **2026-11-20** Pasted content is no longer truncated, and the title bar shows how many tokens the conversation has used. The input box grows as you type and can be resized by dragging. If an answer breaks off halfway, a "↻ Retry" button appears below it. The app gets its own icon.
-- **2026-11-12** New terminal version: chat with Gemini back and forth in the terminal, drag files in to attach their contents, see answers rendered as Markdown, and resume earlier conversations at any time.
-- **2026-11-11** Every request now carries the current time, so the model no longer treats 2026 as "the future".
-- **2026-09-06** When explaining an image, the bubble shows the image itself. The same gesture can also open history: trigger it while holding ⌥, or when the clipboard hasn't changed.
-- **2026-08-31** Every trigger opens a new window, so you can compare several side by side. Your own messages are drawn as chat bubbles.
-- **2026-08-30** ⌘W closes the popup: while a popup is open it borrows ⌘W, so Chrome tabs behind it are no longer closed by accident.
-- **2026-08-16** Fixed ⌘C and ⌘V: copying selected text and pasting into the input box now work.
-- **2026-08-14** Automatic retry when rate-limited (HTTP 429): once every 2 seconds, up to 6 times.
-- **2026-08-13** First release: select, copy, press once, and a popup next to the cursor explains it in plain words.
+## 🚀 Quick start
 
-## What problem it solves
+<details open>
+<summary><b>1. Install</b></summary>
 
-Reading an English paper, a long technical document someone sent you, or a confusing email used to mean: switch to the browser, open some AI website, paste, wait, switch back. All that switching breaks your train of thought.
+```bash
+git clone https://github.com/Mor-Li/nutshell.git
+cd nutshell
+make install
+```
 
-Now: copy, press a shortcut, and the answer floats right next to what you are reading. No window switching, no interruption.
+This builds the app, installs it to `~/Applications/Nutshell.app` and launches it. It has **no Dock icon and no window of its own**: it's a background process listening on local port `8823`. No system permissions are needed, because it only reads the clipboard.
 
-## What you can feed it
+Launch at login (run once):
 
-Not just text. It recognizes whatever you copy:
+```bash
+osascript -e 'tell application "System Events" to make login item at end with properties {path:"'$HOME'/Applications/Nutshell.app", hidden:true}'
+```
 
-| What you copy | How it handles it |
+</details>
+
+<details open>
+<summary><b>2. Point it at a model</b></summary>
+
+Edit `~/.config/nutshell/config.json` (created on first launch):
+
+```jsonc
+{
+  "baseURL": "https://api.openai.com/v1",   // any OpenAI-compatible endpoint
+  "model": "gpt-5.4",
+  "apiKeyEnvVar": "OPENAI_API_KEY"          // read from your shell, or set "apiKey" directly
+}
+```
+
+Then reload without restarting: `curl -s http://127.0.0.1:8823/reload`
+
+> [!NOTE]
+> The app's own interface text (input placeholder, menus) is currently in Chinese. Answers come back in whatever language your prompt asks for, so rewrite `promptTemplate` in English to get English explanations.
+
+</details>
+
+<details open>
+<summary><b>3. Bind a gesture</b></summary>
+
+Anything that can send an HTTP request can trigger Nutshell. With [BetterTouchTool](https://folivora.ai/), a two-finger double-tap (double right-click) works great:
+
+1. In BTT, pick **Normal Mouse** (or your trackpad) and add a **double right-click** trigger
+2. Action 1: **Send Keyboard Shortcut** → `⌘C` (so you don't even need to copy yourself)
+3. Action 2: **Delay Next Action** → `0.08` seconds
+4. Action 3: **Execute Terminal Command (Async, non-blocking)**:
+
+```bash
+curl -s http://127.0.0.1:8823/explain
+```
+
+Now it's just **select → double-tap**. Hold **⌥** while triggering (or trigger without copying anything new) to open the history list instead.
+
+</details>
+
+## 📖 Usage
+
+<details>
+<summary><b>What you can copy</b></summary>
+
+| What you copy | What Nutshell does |
 |---|---|
 | A piece of text | Explains it directly |
 | A PDF file | Extracts the text, then explains |
 | A scanned PDF (no text layer) | Renders the first few pages as images and explains from those |
-| An image / a screenshot | Sends it to a multimodal model and explains the picture |
+| An image / a screenshot | Sends it to a multimodal model |
 | Word, RTF, HTML | Converts to plain text with the built-in `textutil` |
-| .txt/.md/.json/.csv/source code | Reads it directly |
-| Several files selected at once | Text is concatenated, up to 6 images are attached |
+| .txt / .md / .json / .csv / source code | Reads it directly |
+| Several files at once | Text is concatenated, up to 6 images are attached |
 
-## Everything you chat about is kept
+</details>
 
-There is an input box at the bottom of the window. Press Return to ask a follow-up, and it remembers what was said before.
+<details>
+<summary><b>Working with the window</b></summary>
 
-**Each finished round is saved to disk automatically**, under `~/.config/nutshell/sessions/`, one JSON file per conversation.
-**Append only**: no limit, no automatic cleanup, everything is kept.
+- **Trigger again** → a new window explains the current clipboard, old ones stay. Windows opened at the same spot are staggered
+- **⌘W** closes the last window you clicked (or the newest). While a popup is visible, ⌘W belongs to it, so the Chrome tab behind it is never closed by accident
+- **Esc** or **×** closes a window
+- Click anywhere in the window and type a follow-up at the bottom. **Return** sends, **Shift+Return** adds a line. The input grows up to 8 lines, and the divider above it can be dragged
+- If the network drops or the answer breaks off, a **↻ Retry** button resends the last question. It survives reopening from history
+- The **copy icon** copies the whole answer. Selecting text and pressing **⌘C** copies just that part
+- Drag the top bar to move, drag the edges to resize
 
-To go back to an earlier conversation, click the little clock in the top-left corner of the popup:
+</details>
+
+<details>
+<summary><b>History</b></summary>
+
+Every round is saved to `~/.config/nutshell/sessions/`, one JSON file per conversation, **append only**. Click the clock in the top-left corner of any popup:
 
 ```
 ┌─────────────────────────────────────┐
-│ 🕘  gemini-3.1-pro-preview    ⧉  ✕ │  ← click this clock
+│ 🕘  gemini-4-argon            ⧉  ✕ │  ← click the clock
 ├─────────────────────────────────────┤
    ┌───────────────────────────────┐
    │  ＋ New chat (re-read clipboard) │
@@ -66,270 +152,156 @@ To go back to an earlier conversation, click the little clock in the top-left co
    │    What is this email…   22:10 │
    │ ───────────────────────────── │
    │  37 in total · Show in Finder  │
-   │  Clear history…                │
    └───────────────────────────────┘
 ```
 
-Click any entry to switch to it: the window is restored to how it looked, the model's context is restored too, and you can keep asking right there.
-The checked entry is the conversation you are currently in.
+Pick an entry and the window, the model context and any images come back, ready for follow-ups. Hold **Option** to turn an entry into "Delete". The menu lists the latest 30 (`historyMenuCount`).
 
-A few details:
+</details>
 
-- Titles are taken automatically from the first few words of the clipboard, no naming needed
-- **Hold Option** and an entry turns into "Delete this one"
-- The menu lists only the latest 30 entries by default (more would run off the screen). All of them are in that folder, and the bottom of the menu has a shortcut to open it in Finder. To list more, change `historyMenuCount` in the config
-- Images are saved too, so when you switch back to a conversation about an image, the model can still see it
-
-Pressing the shortcut **always starts a new conversation**. That never changes, so the everyday "copy → press" feel stays the same.
-
-## Install
+<details>
+<summary><b>Commands</b></summary>
 
 ```bash
-make install
-```
-
-Builds, packages, installs to `~/Applications/Nutshell.app`, and launches it.
-
-It **has no UI of its own**: no Dock icon, no menu bar item by default, just a background process listening on a port. To check whether it is running:
-
-```bash
-pgrep -x Nutshell
-```
-
-**No system permissions needed**: it only reads the clipboard, and reading the clipboard is free.
-
-Launch at login (run once after installing):
-
-```bash
-osascript -e 'tell application "System Events" to make login item at end with properties {path:"'$HOME'/Applications/Nutshell.app", hidden:true}'
-```
-
-## Setting up BetterTouchTool (double right-click)
-
-The app stays in the background and listens on local port `8823`. Anything that can send an HTTP request can wake it up. BTT is just one option.
-
-1. Open BTT and pick **Normal Mouse** (or whichever mouse device you use) in the top-left
-2. Click **+** to add a new trigger and choose **double right-click**
-3. On the right, add an action: **Execute Terminal Command (Async, non-blocking)**
-4. Use this command:
-
-```bash
-curl -s http://127.0.0.1:8823/explain
-```
-
-**Recommended: add one more step and skip Cmd+C entirely.** Before step 3 above, add two actions so BTT presses copy for you:
-
-1. Action one: **Send Keyboard Shortcut** → `⌘C`
-2. Action two: **Delay Next Action** → `0.08` seconds (gives the frontmost app time to put the content on the clipboard)
-3. Action three: the `curl` command above
-
-With this setup you just **select → double right-click**, in one step.
-
-**The same gesture can also open history.** In two cases it opens the history list instead of explaining:
-when you trigger it while holding ⌥ (Option), or when you trigger it without copying anything new (the clipboard is the same as last time).
-To explain the same text again, use "＋ New chat (re-read clipboard)" at the top of the list. Nothing extra needs to be set up in BTT.
-
-## Four commands to control it
-
-```bash
-curl -s http://127.0.0.1:8823/explain   # trigger (this is what BTT is bound to)
-curl -s http://127.0.0.1:8823/history   # open the history list directly (if you want another gesture for it)
-curl -s http://127.0.0.1:8823/reload    # reload after editing the config
+curl -s http://127.0.0.1:8823/explain   # explain the clipboard (bind this to your gesture)
+curl -s http://127.0.0.1:8823/history   # open the history list directly
+curl -s http://127.0.0.1:8823/reload    # reload config.json
 pkill -x Nutshell                       # quit
 ```
 
-## Changing the prompt or the model
+</details>
 
-The config file is `~/.config/nutshell/config.json`.
-After editing it, run `curl -s http://127.0.0.1:8823/reload`. **No rebuild and no restart needed.**
+## ⚙️ Configuration
 
-The fields you will change most often:
+<details>
+<summary><b>All fields in <code>~/.config/nutshell/config.json</code></b></summary>
 
 ```jsonc
 {
   // What gets sent to the model. {content} is replaced with what you copied.
+  // The defaults are in Chinese ("explain this in plain, easy words"); write them in any language.
   "promptTemplate": "用通俗易懂的大白话讲一下下面讲的是什么东西：\n\n{content}\n\n用通俗易懂的大白话讲一下上面讲的是什么东西。",
-
-  // Used when you copied an image (no {content})
   "imagePromptTemplate": "用通俗易懂的大白话讲一下这张图里讲的是什么东西。",
-
-  // Any OpenAI-compatible /chat/completions works: the official API, a self-hosted gateway,
-  // a company proxy, or a local Ollama (http://localhost:11434/v1)
   "baseURL": "https://api.openai.com/v1",
   "model": "gpt-5.4",
-
-  // Which shell environment variable to read the key from (or put it directly in the apiKey field)
   "apiKeyEnvVar": "OPENAI_API_KEY"
 }
 ```
 
-The default prompts are in Chinese ("explain what the following is about in plain, easy words"). Rewrite them in any language you like.
-
-Explaining images requires a multimodal model. For text only, any model works.
-
-**A quick way to tune the prompt** (without restarting the app again and again):
-
-```bash
-./scripts/try-prompt.sh "text to explain"
-```
-
-It calls the gateway once with the prompt and model from the config file and prints the result in the terminal, without going through the app.
-Once you are happy, run `curl -s http://127.0.0.1:8823/reload` to apply it in the app.
-
-Other settings:
-
 | Field | What it does |
 |---|---|
-| `window.width` / `height` | Popup size |
-| `window.fontSize` | Body font size |
-| `window.gap` | Distance between the popup and the cursor |
-| `port` | Trigger port. Change it if something else is using it |
-| `contextWindow` | How large the model's context window is (in tokens), 1 million by default. Only used to show "used / total" in the title bar. Nothing is truncated: whatever you paste is sent in full |
-| `maxImages` | Maximum number of images per request |
-| `maxScannedPDFPages` | How many pages of a scanned PDF to look at |
-| `showMenuBarIcon` | `false` by default. Set to `true` to show a bubble icon in the menu bar with open config / reload / quit |
-| `systemPrompt` | System prompt, empty by default. Whether or not you fill it in, the app always appends the current time after it (in Gemini's official format: "Current time is Wednesday, November 11, 2026 at 11:40 PM GMT+8."), so the model doesn't treat the current year as "the future". You don't need to write that line yourself. If you want Gemini's official system prompt, you can copy the identity and knowledge-cutoff parts from [asgeirtj/system_prompts_leaks](https://github.com/asgeirtj/system_prompts_leaks/tree/main/Google). Skip the tool definitions and jailbreak-detection parts |
-| `historyMenuCount` | How many entries the history menu lists, 30 by default (no conversation on disk is ever deleted) |
-| `rateLimitRetries` | How many times to retry on a 429, 6 by default. 0 means report the error right away |
-| `rateLimitRetryDelay` | Seconds to wait between retries, 2 by default |
+| `window.width` / `height` / `fontSize` / `gap` | Popup size, body font size, distance from the cursor |
+| `port` | Trigger port (default `8823`) |
+| `contextWindow` | Model context size in tokens (default 1M). Only used for the "used / total" display. Nothing is ever truncated |
+| `maxImages` / `maxScannedPDFPages` | Limits for images per request and pages of a scanned PDF |
+| `showMenuBarIcon` | `true` adds a menu bar icon with open config / reload / quit |
+| `systemPrompt` | Optional system prompt. The current time is always appended, so the model knows what year it is |
+| `historyMenuCount` | How many entries the history menu shows (default 30) |
+| `rateLimitRetries` / `rateLimitRetryDelay` | Automatic retries on HTTP 429 (default 6 times, 2 s apart) |
 
-You don't have to put the API key in the config file: the app runs `source ~/.zshrc` to read `$OPENAI_API_KEY` (change the variable name with `apiKeyEnvVar`), and it picks up a changed key automatically (a 401 triggers one re-read). If you prefer to hard-code it, fill in the `apiKey` field.
+The API key can stay in your shell: Nutshell runs `source ~/.zshrc` to read the variable named by `apiKeyEnvVar`, and re-reads it once on a 401. To try a prompt without the app, run `./scripts/try-prompt.sh "some text"`.
 
-## Using the window
+</details>
 
-- **Press the shortcut again** → another new window explains the current clipboard, and the old one stays. You can have several windows at once. Pressing repeatedly at the same spot staggers them so they don't stack exactly on top of each other
-- **⌘W** → closes one. With several open, it closes the one you last clicked, or the newest one if you haven't clicked any, so pressing it repeatedly closes them from the top down. While a popup is visible, ⌘W belongs to it: a system-wide hotkey takes it first, so Chrome / VS Code behind it never receive it and no tab gets closed by mistake. As soon as the last popup closes, ⌘W goes back to normal
-- Click the **×** in the top-right, or press **Esc** after clicking the popup → closes that window
-- Click anywhere in the window → the cursor jumps to the input box at the bottom, and **you can ask follow-ups** (multi-turn, it remembers what was said)
-- In the input box, **Return sends, Shift+Return adds a new line**. It normally takes one line. When you type more or paste a big chunk, it grows on its own up to 8 lines, then scrolls inside. You can type your next message while it is still answering, and press Return once it is done
-- The line above the input box **can be dragged up and down** to any height you like. Double-click the line to go back to automatic, which also happens after you send a message
-- Network dropped, timed out, or the answer broke off halfway → a **↻ Retry** button appears below the error. Click it to resend the last question without typing it again. The partial answer and the error are cleared and don't stay in the conversation. The button is still there if you close the window and reopen it from history
-- Math formulas in answers are typeset properly (`$…$`, `$$…$$`, `\(…\)` and `\[…\]` are all recognized), instead of showing raw `\frac` and `^`
-- Click the **copy icon** in the top-right → copies the whole answer
-- Select part of the body text → **Cmd+C** copies just that part (Cmd+V paste, Cmd+A select all and Cmd+Z undo also work in the input box)
-- Drag the top bar → move the window. Drag the edges → resize it
-- The window floats on top but **doesn't steal focus**: when it pops up, your original app stays in front
+## 🖥 Terminal version
 
-## Terminal version: plain chat with Gemini in the terminal
-
-The popup is good for "I don't get this, quick question". If you want to sit down and go back and forth (discussing a plan, polishing an article), use the terminal version:
+<details>
+<summary><b>Plain back-and-forth chat in your terminal</b></summary>
 
 ```bash
-uv tool install --editable ./cli    # install once, then use it from any directory
-nutshell                            # start chatting, or use the short form: nut
+uv tool install --editable ./cli    # once
+nutshell                            # or: nut
 ```
 
-It's just question and answer, no tools and no agent, so it's fast. It shares the same `config.json` with the popup (gateway, model, `systemPrompt`), so there is nothing extra to configure.
-
-**The whole conversation stays in the terminal as is**: no full-screen UI, no screen clearing, output is only appended, never rewritten. When you are done, **Cmd+A to select all and copy**, and you have the complete chat log, ready to paste to Claude to save as a file. If the terminal's scrollback is too short and the beginning has been pushed out, type `/copyall` to get the complete log anyway (the VS Code terminal keeps only 1000 lines by default; raise `terminal.integrated.scrollback`).
-
-Markdown in answers is rendered before it is shown: headings, bold, lists, tables and code highlighting are laid out properly, so you don't see a pile of `**` and `#`. Rendering happens while the answer streams in, paragraph by paragraph: the paragraph being received is shown temporarily at the bottom, and each paragraph is finalized once it is complete. That way Cmd+A copies the formatted text. For the raw Markdown, use `/copy` or `/copyall`. To turn rendering off, start with `--raw`, or type `/raw` during a chat to toggle it.
-
-**Dragging things in**: drag files, images, PDFs or folders from Finder or your editor's sidebar into the terminal. The terminal shows the path, and when the message is sent, the path is replaced in place with the content:
-
-| What you drag in | What the model gets |
-|---|---|
-| Text files (`.md`, code, `.json`…) | The full text |
-| Images (PNG / JPG / HEIC / WebP…) | The image itself, with the longest side scaled down to 2048 pixels |
-| PDF | The whole original file. Gemini looks at every page as an image and reads the text at the same time. All pages are sent |
-| Word / RTF | Converted to plain text |
-| Folders | Every file inside, each handled by the rules above. Inside a git repository, files ignored by `.gitignore` are skipped |
-
-One message can include several attachments, and you can type and drag at the same time. If the attachments are very large (over 200,000 tokens or 60 images), it asks before sending. Because the terminal keeps the paths, after you paste the chat log to Claude, it can read those files itself by following the paths.
-
-**Switching backends**: by default it uses the gateway in `config.json`. When that key is saturated by batch jobs, switch to your own Google AI Studio key:
-
-```bash
-nutshell --own      # use your own key from the start
-```
-
-You can also switch mid-chat: type `/own` to switch over and `/work` to switch back, without losing the conversation. Create your key in [AI Studio](https://aistudio.google.com/api-keys), then put it in `.env` at the repository root (this file is not committed):
-
-```
-GEMINI_AI_STUDIO_KEY_NUTSHELL='your key'
-```
+- Question and answer only, no tools, no agent, so it's fast. Shares `config.json` with the popup
+- Answers are rendered as Markdown while they stream. The whole chat stays in your scrollback, so ⌘A + copy gives you the full log (`/copyall` gets the raw Markdown)
+- **Drag files in**: text files are inlined, images are attached, PDFs are sent whole, folders are expanded (respecting `.gitignore`)
+- Every answer is saved. `nutshell -r` lists past chats with auto-generated titles, `nutshell -c` continues the latest one
+- `--own` / `/own` switches to your own Google AI Studio key (`GEMINI_AI_STUDIO_KEY_NUTSHELL` in `.env`), `/work` switches back
 
 | Command | What it does |
 |---|---|
-| `/own`, `/work` | Switch to your own key / back to the gateway |
-| `/model name` | Change model |
-| `/models` | List the Gemini models the current key can use |
-| `/copy` | Copy the last answer (raw Markdown) |
-| `/copyall` | Copy the whole chat log (raw Markdown) |
-| `/raw` | Toggle Markdown rendering. When off, answers are printed as plain text |
-| `/new` | Start a new conversation |
-| `/resume` | List earlier conversations and pick one with the arrow keys to continue |
-| `/exit`, Ctrl+D or Ctrl+C twice | Quit |
+| `/own`, `/work` | Switch backend |
+| `/model name`, `/models` | Change model / list available models |
+| `/copy`, `/copyall` | Copy the last answer / the whole chat as Markdown |
+| `/raw` | Toggle Markdown rendering |
+| `/new`, `/resume` | New chat / pick an old one |
+| `/exit`, Ctrl+D | Quit |
 
-Return sends, **Option+Return** (or Esc then Return) adds a new line, and pasting multiple lines doesn't split them into separate messages. Press Ctrl+C while waiting for an answer to interrupt it. `nutshell -p "one question"` asks a single question, prints the answer and exits.
+</details>
 
-**Continuing earlier conversations**: every answer is saved as soon as it is received (under `~/.config/nutshell/chats/`), so you can quit at any time, or even just close the terminal, without losing anything. On exit it prints a line like `接着聊：nutshell -r <id>` ("continue: …"); type it to return to that conversation. If you don't remember the id, type `nutshell -r` (or `/resume` during a chat) to list recent conversations, pick one with the arrow keys and press Return. `nutshell -c` continues the most recent one directly. After resuming, the earlier questions and answers are printed again, so the terminal still holds the complete log.
+## 📰 News
 
-Each conversation in the list gets a title written by the model: it is generated quietly in the background after the first few rounds, without holding up your chat. Older conversations without a title get one all at once the first time they are listed. The prompt used for titles is `TITLE_PROMPT` at the top of `cli/nutshell_cli/main.py`. Change the wording there.
+- **2026-11-21** Math rendering in the popup: `$…$`, `$$…$$`, `\(…\)` and `\[…\]` are all typeset, while prices ("$5 to $10") and `$` inside code stay as plain text. Works offline. New flat-style icon without the rounded-square frame. New README with a demo animation.
+- **2026-11-20** Pasted content is no longer truncated, and the title bar shows how many tokens the conversation has used. The input box grows as you type and can be resized by dragging. If an answer breaks off halfway, a "↻ Retry" button appears. The app gets its own icon.
+- **2026-11-12** New terminal version: chat with Gemini in the terminal, drag files in to attach them, see answers rendered as Markdown, and resume earlier conversations.
+- **2026-11-11** Every request carries the current time, so the model no longer treats 2026 as "the future".
+- **2026-09-06** When explaining an image, the bubble shows the image itself. The same gesture can also open history.
+- **2026-08-31** Every trigger opens a new window, so you can compare several side by side. Your own messages are drawn as chat bubbles.
+- **2026-08-30** ⌘W closes the popup without closing the Chrome tab behind it.
+- **2026-08-16** Fixed ⌘C and ⌘V in the popup.
+- **2026-08-14** Automatic retry when rate-limited (HTTP 429).
+- **2026-08-13** First release.
 
-## Why it stays in the background
+## 🛠 Troubleshooting
 
-Because it needs to be fast. If the app had to start and build its window only after you pressed the shortcut, it would take at least half a second to a second before you saw anything, and that is before the model even starts. Staying resident means it appears the moment you press.
-
-## Troubleshooting
-
-**Nothing happens when I press it**: first check that the process is running, then that it is the one listening on the port:
+<details>
+<summary><b>Nothing happens when I trigger it</b></summary>
 
 ```bash
 pgrep -x Nutshell && lsof -nP -iTCP:8823 -sTCP:LISTEN
 ```
 
-If the port is taken by another program, Nutshell shows a dialog telling you so (it doesn't fail silently). Just change `port`.
+If the port is taken by another program, Nutshell shows a dialog saying so. Change `port`.
 
-**It says it can't find the API key**:
+</details>
+
+<details>
+<summary><b>It can't find the API key</b></summary>
 
 ```bash
 source ~/.zshrc && echo ${OPENAI_API_KEY: -4}
 ```
 
-If something is printed, you are fine. If not, the key isn't set up, or it isn't reachable through `~/.zshrc`.
+If nothing is printed, the key isn't reachable through `~/.zshrc`. Set `apiKey` in the config instead.
 
-**Rate-limited with a 429**: nothing to do, it retries on its own, once every 2 seconds, up to 6 times, and the window shows which attempt it is on.
+</details>
 
-The common 429 message `Limit type: max_parallel_requests. Current limit: 2` doesn't mean "you pressed too fast".
-It means **the number of requests this key can run at the same time** is used up, most likely because you are running batch jobs elsewhere,
-or the key is shared with other people. That kind of limit frees up within seconds, so just wait.
-If you really can't wait, change `rateLimitRetries` and `rateLimitRetryDelay`.
+<details>
+<summary><b>HTTP 429 rate limits</b></summary>
 
-## Layout
+Nutshell retries on its own (every 2 seconds, up to 6 times) and shows the attempt number. A message like `max_parallel_requests` means the key's concurrent-request slots are busy, usually because of batch jobs elsewhere. It frees up within seconds.
+
+</details>
+
+## 🗂 Project layout
+
+<details>
+<summary><b>Where things are</b></summary>
 
 ```
-Sources/Nutshell/       Popup version (Swift)
-  main.swift            Startup, registers as a background app without a Dock icon
-  AppDelegate.swift     Coordinator: triggers, chat history, optional menu bar icon
-  TriggerServer.swift   Listens on 127.0.0.1:8823, BTT wakes it up with curl
-  CloseHotKey.swift     Takes over ⌘W while a window is open
-  InputCapture.swift    Figures out whether the clipboard holds text/PDF/images/files and handles each
-  ExplainWindowController.swift  One conversation in one window: ask, follow up, retry, save
-  LLMClient.swift       Calls the gateway, receives text over SSE streaming
-  PopoverPanel.swift    The popup itself + adaptive positioning + layout of the input area at the bottom
-  ComposerViews.swift   Two parts of the input area: the self-growing input box and the draggable divider
-  MarkdownView.swift    WKWebView wrapper, handles rendering
-  SessionStore.swift    Saves chat history to disk (one JSON per conversation, append only)
-  Config.swift          Reads and writes the config (prompt constants at the top of the file)
-  Resources/
-    viewer.html         The rendering page (styles, thinking animation, auto-scroll, retry button)
-    marked.min.js       Markdown parser, bundled into the app, works offline
-    katex.min.js        KaTeX math typesetting library, bundled into the app, works offline
-    katex.inline.min.css  KaTeX styles, with the fonts embedded as base64
-Tests/NutshellTests/    Automated tests for the popup version, run with `make test`, no windows shown, no network
-scripts/                Development helper scripts
-  explain_repo.py       Generates a plain-language explanation for every file (in docs/explain/, not committed)
-  try-prompt.sh         Tries a prompt in the terminal without opening the app
-  make_icon.py          Cuts the solid background out of icon/AppIcon-source.png and builds the app icon
-  vendor_katex.py       For upgrading KaTeX: fetches a new version and embeds the fonts into the CSS
-icon/                   Source image and finished app icon
-cli/nutshell_cli/       Terminal version (Python, installed with uv)
-  main.py               Chat loop, commands, the two backends, streaming output
-  attach.py             Recognizes dragged-in paths and replaces them with file contents / images / original PDFs
-  render.py             Renders Markdown in answers to the terminal paragraph by paragraph
+Sources/Nutshell/          The popup app (Swift, AppKit)
+  AppDelegate.swift        Coordinator: triggers, windows, history menu
+  TriggerServer.swift      Listens on 127.0.0.1:8823
+  InputCapture.swift       Turns the clipboard (text / PDF / images / files) into model input
+  ExplainWindowController  One conversation per window: ask, follow up, retry, save
+  LLMClient.swift          OpenAI-compatible streaming client with 429 retry
+  PopoverPanel.swift       The popup itself, positioning, input area
+  MarkdownView.swift       WKWebView that renders the answer
+  Resources/               viewer.html, marked.js and KaTeX, all bundled, no network
+Tests/NutshellTests/       Automated tests (`make test`), no windows, no network
+cli/nutshell_cli/          The terminal version (Python, installed with uv)
+demo/                      Source of the demo animation and banner (`uv run demo/render.py`)
+icon/                      App icon source and build (`uv run scripts/make_icon.py`)
+scripts/                   Dev helpers: prompt tester, icon builder, KaTeX vendoring
 ```
 
-## License
+</details>
 
-MIT. Use it however you like.
+## 🤝 Contributing
+
+Issues and pull requests are welcome. Please run `make test` before sending a PR. UI changes should come with a test in `Tests/NutshellTests/`.
+
+## 📜 License
+
+[MIT](LICENSE). Use it however you like.

@@ -1,0 +1,764 @@
+<!doctype html>
+<!--
+  Nutshell 的演示动画。一台 MacBook，两只手放在键盘和触控板上：
+  ⌘A 全选 → ⌘C 复制 → 右手两指在触控板上连点两下 → 浮窗弹出来用大白话讲。
+
+  画面的每个状态都由时间 t（秒）算出来，renderAt(t) 画哪一刻就是哪一刻，
+  所以 render.py 可以逐帧截图拼成 GIF，不受浏览器卡顿影响。
+  直接用浏览器打开这个文件就能循环播放预览；?lang=zh 是中文版，?t=5.2 停在某一刻。
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<title>Nutshell demo</title>
+<link rel="stylesheet" href="../Sources/Nutshell/Resources/katex.inline.min.css">
+<script src="../Sources/Nutshell/Resources/katex.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #e9e3da; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif; -webkit-font-smoothing: antialiased; }
+
+  #stage {
+    position: relative; width: 1200px; height: 750px; overflow: hidden;
+    background:
+      radial-gradient(ellipse 70% 60% at 50% 38%, rgba(255,255,255,.55), rgba(255,255,255,0) 70%),
+      linear-gradient(180deg, #efe9e1 0%, #e6dfd4 55%, #d9d0c3 100%);
+  }
+  #world { position: absolute; left: 0; top: 0; width: 1200px; height: 750px; transform-origin: 0 0; }
+
+  /* ── 桌面上的投影 ── */
+  #floor-shadow {
+    position: absolute; left: 150px; top: 520px; width: 900px; height: 260px;
+    background: radial-gradient(ellipse at 50% 40%, rgba(60,40,20,.28), rgba(60,40,20,0) 65%);
+    filter: blur(6px);
+  }
+
+  /* ── 屏幕 ── */
+  #lid {
+    position: absolute; left: 262px; top: 26px; width: 676px; height: 428px;
+    border-radius: 18px 18px 6px 6px;
+    background: #0c0c0d;
+    box-shadow: 0 0 0 1px #8e9298, 0 0 0 4.5px #cfd2d6, 0 0 0 5.5px #a4a8ae, 0 18px 40px rgba(40,30,20,.25);
+    background-image: linear-gradient(180deg, #161618, #0b0b0c);
+  }
+  #display {
+    position: absolute; left: 10px; top: 10px; width: 656px; height: 402px;
+    border-radius: 9px 9px 2px 2px; overflow: hidden;
+    background: linear-gradient(135deg, #8aa7c9, #c9b6d6 60%, #e8c3a8);
+  }
+  #notch { position: absolute; left: 50%; top: 0; width: 86px; height: 11px; margin-left: -43px; background: #0c0c0d; border-radius: 0 0 6px 6px; z-index: 50; }
+  #hinge {
+    position: absolute; left: 248px; top: 451px; width: 704px; height: 9px;
+    border-radius: 0 0 5px 5px;
+    background: linear-gradient(180deg, #4b4d51, #9a9da2 70%, #c8cbcf);
+  }
+
+  /* 菜单栏 */
+  #menubar {
+    position: absolute; left: 0; top: 0; right: 0; height: 13px; z-index: 5;
+    background: rgba(246,246,248,.8); backdrop-filter: blur(8px);
+    font-size: 7.2px; line-height: 13px; color: #1d1d1f; padding: 0 9px;
+    display: flex; gap: 9px;
+  }
+  #menubar b { font-weight: 700; }
+  #menubar .right { margin-left: auto; display: flex; align-items: center; gap: 7px; }
+  #menubar .right svg { height: 7.5px; width: auto; display: block; }
+
+  /* 看 PDF 的窗口 */
+  #reader {
+    position: absolute; left: 22px; top: 22px; width: 612px; height: 352px;
+    border-radius: 7px; overflow: hidden; background: #d6d6d8;
+    box-shadow: 0 6px 20px rgba(0,0,0,.25), 0 0 0 .5px rgba(0,0,0,.25);
+  }
+  #reader-bar {
+    height: 28px; background: linear-gradient(#f6f6f7, #ececee); border-bottom: .5px solid #c8c8ca;
+    display: flex; align-items: center; padding: 0 9px; gap: 4px; font-size: 7px; color: #333;
+  }
+  #reader-bar .titles { margin-left: 14px; line-height: 1.25; }
+  #reader-bar .titles b { display: block; font-size: 7.4px; font-weight: 650; color: #222; }
+  #reader-bar .titles span { font-size: 6px; color: #8a8a8e; }
+  #reader-bar .tools { margin-left: auto; display: flex; gap: 9px; align-items: center; }
+  #reader-bar .tools svg { width: 9px; height: 9px; display: block; }
+  .light { width: 6px; height: 6px; border-radius: 50%; }
+  #page {
+    position: absolute; left: 136px; top: 38px; width: 340px; height: 420px;
+    background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.25);
+    padding: 16px 22px; color: #111;
+    font-family: "Times New Roman", "Songti SC", serif;
+  }
+  #page h1 { font-size: 9.6px; line-height: 1.2; text-align: center; margin: 0 0 3px; font-weight: 700; }
+  #page .authors { font-size: 5.6px; text-align: center; color: #333; margin-bottom: 6px; }
+  #page h2 { font-size: 6.4px; margin: 5px 0 2px; font-weight: 700; }
+  #page p { font-size: 5.25px; line-height: 1.38; margin: 0 0 3px; text-align: justify; hyphens: auto; }
+  #page .abs { margin: 0 10px 4px; }
+  #page .abs b { font-size: 5.6px; }
+  #page .eq { font-size: 6px; text-align: center; margin: 3px 0 4px; }
+  #page .sel { background: rgba(128,176,255,0); -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+  #page figure { margin: 4px 0 0; text-align: center; }
+  #page figure svg { width: 230px; height: 62px; display: block; margin: 0 auto 2px; }
+  #page figcaption { font-size: 5px; line-height: 1.35; color: #222; text-align: justify; }
+
+
+  /* 鼠标指针 */
+  #cursor { position: absolute; width: 15px; height: 22px; z-index: 60; transform-origin: 0 0; filter: drop-shadow(0 1px 1px rgba(0,0,0,.3)); }
+
+  /* ── Nutshell 浮窗 ── */
+  #popup {
+    position: absolute; width: 330px; height: 290px; z-index: 40;
+    border-radius: 10px; overflow: hidden;
+    background: rgba(248,248,250,.93); backdrop-filter: blur(30px) saturate(1.5);
+    box-shadow: 0 14px 38px rgba(0,0,0,.32), 0 0 0 .5px rgba(0,0,0,.22);
+    transform-origin: 0 0; opacity: 0;
+    color: #1d1d1f; font-size: 9.1px; line-height: 1.6;
+  }
+  #pop-head {
+    height: 22px; display: flex; align-items: center; gap: 6px; padding: 0 8px;
+    border-bottom: .5px solid rgba(0,0,0,.08); font-size: 7.6px; color: #6e6e73;
+  }
+  #pop-head svg { width: 10px; height: 10px; flex: none; }
+  #pop-head .sp { flex: 1; }
+  #pop-body { position: absolute; left: 0; right: 0; top: 22px; bottom: 30px; overflow: hidden; padding: 8px 11px; }
+  .bubble-row { display: flex; justify-content: flex-end; margin-bottom: 7px; }
+  .bubble {
+    max-width: 86%; background: #0b84ff; color: #fff; padding: 4px 8px 3px;
+    border-radius: 11px; border-bottom-right-radius: 4px; font-size: 8.4px; line-height: 1.45;
+  }
+  .bubble .txt { white-space: pre-wrap; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+  .bubble .more { font-size: 7.2px; opacity: .75; margin-top: 1px; }
+  #thinking { display: flex; align-items: center; gap: 6px; color: #86868b; padding: 2px 1px; }
+  .dots { display: inline-flex; gap: 3px; }
+  .dots i { width: 4.5px; height: 4.5px; border-radius: 50%; background: #86868b; display: block; }
+  #answer p { margin: 0 0 6px; }
+  #answer b { font-weight: 650; }
+  #answer .katex { font-size: 1.08em; }
+  #answer .katex-display { margin: 3px 0 7px; }
+  .caret { display: inline-block; width: 1.5px; height: 1.05em; vertical-align: -.17em; background: #1d1d1f; opacity: .55; margin-left: 1px; }
+  #pop-input {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 30px;
+    border-top: .5px solid rgba(0,0,0,.1); padding: 8px 11px; font-size: 7.8px; color: #a1a1a6;
+  }
+
+  /* ── 键盘这一面：用 3D 斜放，近大远小 ── */
+  #deck-wrap { position: absolute; left: 120px; top: 456px; width: 960px; height: 640px; perspective: 2200px; perspective-origin: 50% -300px; transform: scale(.725); transform-origin: 50% 0; }
+  #deck {
+    position: absolute; left: 0; top: 0; width: 960px; height: 640px;
+    transform-origin: 50% 0; transform: rotateX(62deg); transform-style: preserve-3d;
+    border-radius: 10px 10px 26px 26px;
+    background: linear-gradient(180deg, #d5d8dc 0%, #e3e5e8 30%, #dfe1e4 100%);
+    box-shadow: inset 0 2px 0 rgba(255,255,255,.7), 0 0 0 1.5px #b9bcc1;
+  }
+  #kb-well { position: absolute; left: 40px; top: 20px; width: 880px; height: 352px; border-radius: 10px; background: #d5d8dc; box-shadow: inset 0 1px 2px rgba(0,0,0,.08); }
+  .key {
+    position: absolute; border-radius: 7px;
+    background: linear-gradient(180deg, #2a2a2d, #1c1c1e);
+    box-shadow: 0 2px 0 #0d0d0e, inset 0 1px 0 rgba(255,255,255,.07);
+    color: #e9e9ec; font-size: 15px; display: flex; align-items: center; justify-content: center;
+    transform-style: preserve-3d;
+  }
+  .key.small { font-size: 11px; align-items: flex-end; justify-content: flex-start; padding: 0 0 7px 9px; }
+  .key.fn { font-size: 10px; }
+  #trackpad {
+    position: absolute; left: 255px; top: 398px; width: 450px; height: 226px; border-radius: 14px;
+    background: linear-gradient(180deg, #d1d4d8, #d8dbde);
+    box-shadow: 0 0 0 1px rgba(0,0,0,.14), inset 0 1.5px 0 rgba(255,255,255,.6), inset 0 2px 6px rgba(0,0,0,.05);
+  }
+  /* 机身前沿的侧面和开盖凹口，让键盘面有厚度 */
+  #deck-front { position: absolute; left: 14px; top: 640px; width: 932px; height: 16px; transform-origin: 50% 0; transform: rotateX(-90deg); border-radius: 0 0 14px 14px; background: linear-gradient(180deg, #b9bcc1, #a3a6ac); }
+  #deck-notch { position: absolute; left: 430px; top: 628px; width: 100px; height: 12px; border-radius: 12px 12px 0 0; background: linear-gradient(180deg, #c9ccd0, #d9dbde); }
+  #hands { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+
+  /* ── 底部字幕条 ── */
+  #hud {
+    position: absolute; left: 50%; top: 656px; transform: translateX(-50%);
+    display: flex; align-items: center; justify-content: center; white-space: nowrap; overflow: hidden;
+    height: 60px; padding: 0 20px; border-radius: 16px;
+    background: rgba(28,28,30,.82); backdrop-filter: blur(12px);
+    color: #fff; font-size: 21px; font-weight: 600; letter-spacing: .1px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.25); opacity: 0;
+  }
+  #hud-inner { display: flex; align-items: center; gap: 12px; }
+  #hud .caps { display: flex; gap: 6px; align-items: center; }
+  #hud kbd {
+    font: inherit; font-size: 19px; min-width: 38px; height: 38px; padding: 0 9px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 9px; background: linear-gradient(#f7f7f8, #dedfe2); color: #1d1d1f;
+    box-shadow: 0 3px 0 #9a9ca1, inset 0 1px 0 #fff;
+  }
+  #hud .tap { width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center; }
+  #step { font-size: 14px; font-weight: 600; color: rgba(255,255,255,.6); letter-spacing: .5px; }
+
+  #brand {
+    position: absolute; left: 26px; top: 22px; display: flex; align-items: center; gap: 9px;
+    font-size: 20px; font-weight: 700; color: #3a2a20; letter-spacing: -.2px;
+  }
+  #brand img { width: 34px; height: 34px; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="world">
+    <div id="floor-shadow"></div>
+
+    <div id="lid">
+      <div id="notch"></div>
+      <div id="display">
+        <div id="menubar"><b>&#63743;</b><span id="menus"></span><span class="right">
+          <svg viewBox="0 0 22 16"><path d="M11 14.5l2.2-2.6a3 3 0 0 0-4.4 0zM5.4 9.6l1.6 1.8a5.7 5.7 0 0 1 8 0l1.6-1.8a8.2 8.2 0 0 0-11.2 0zM2 6.2l1.6 1.8a10.6 10.6 0 0 1 14.8 0L20 6.2a13 13 0 0 0-18 0z" fill="#1d1d1f"/></svg>
+          <svg viewBox="0 0 28 13"><rect x=".7" y=".7" width="23" height="11.6" rx="3.2" fill="none" stroke="#1d1d1f" stroke-opacity=".45" stroke-width="1.2"/><rect x="2.4" y="2.4" width="16" height="8.2" rx="1.8" fill="#1d1d1f"/><path d="M25.5 4.3v4.4c.9-.3 1.5-1.2 1.5-2.2s-.6-1.9-1.5-2.2z" fill="#1d1d1f" fill-opacity=".45"/></svg>
+          <svg viewBox="0 0 16 16"><rect x="1" y="2" width="14" height="5" rx="2.5" fill="none" stroke="#1d1d1f" stroke-width="1.3"/><circle cx="11.5" cy="4.5" r="1.6" fill="#1d1d1f"/><rect x="1" y="9" width="14" height="5" rx="2.5" fill="none" stroke="#1d1d1f" stroke-width="1.3"/><circle cx="4.5" cy="11.5" r="1.6" fill="#1d1d1f"/></svg>
+          <span id="clock"></span></span></div>
+        <div id="reader">
+          <div id="reader-bar"><span class="light" style="background:#ff5f57"></span><span class="light" style="background:#febc2e"></span><span class="light" style="background:#28c840"></span>
+            <span class="titles"><b>spectral-collapse.pdf</b><span id="pageinfo">Page 1 of 23</span></span>
+            <span class="tools">
+              <svg viewBox="0 0 20 20" fill="none" stroke="#7a7a7e" stroke-width="1.6"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M6 8.5h5"/><path d="M13 13l4.5 4.5"/></svg>
+              <svg viewBox="0 0 20 20" fill="none" stroke="#7a7a7e" stroke-width="1.6"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M6 8.5h5M8.5 6v5"/><path d="M13 13l4.5 4.5"/></svg>
+              <svg viewBox="0 0 20 20" fill="none" stroke="#7a7a7e" stroke-width="1.6"><path d="M4 16l1-4 8.5-8.5 3 3L8 15z"/><path d="M11.5 5.5l3 3"/></svg>
+              <svg viewBox="0 0 20 20" fill="none" stroke="#7a7a7e" stroke-width="1.6"><path d="M10 3v10M6.5 6.5L10 3l3.5 3.5"/><path d="M5 10H4v7h12v-7h-1"/></svg>
+              <svg viewBox="0 0 20 20" fill="none" stroke="#7a7a7e" stroke-width="1.6"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M13 13l4.5 4.5"/></svg>
+            </span></div>
+          <div id="page">
+            <h1>Spectral Collapse of Low-Rank Adapters<br>under Non-Stationary Curricula</h1>
+            <div class="authors">Anonymous Authors · Under review</div>
+            <p class="abs"><b>Abstract.</b> <span id="abs-text">We study the dynamics of parameter-efficient fine-tuning when the data distribution drifts during training. We show that the singular spectrum of the adapter update ΔW = BA concentrates onto a vanishing number of directions, a phenomenon we term <i>spectral collapse</i>, and that the collapse rate is governed by the curvature mismatch between successive curriculum phases. Under mild assumptions on the Hessian we derive a bound relating the effective rank r<sub>eff</sub>(ΔW) to the drift magnitude, and propose a nuclear-norm regularizer that provably preserves rank. Experiments on 14 instruction-tuning benchmarks confirm the predicted phase transition.</span></p>
+            <h2>1&nbsp;&nbsp;Introduction</h2>
+            <p>Low-rank adaptation (LoRA) freezes the pretrained weights W<sub>0</sub> and learns a factorized update ΔW = BA with B ∈ ℝ<sup>d×r</sup>, A ∈ ℝ<sup>r×k</sup> and r ≪ min(d, k). While its efficiency is well documented, comparatively little is known about how the learned subspace evolves when the curriculum is non-stationary, as is the norm in continual instruction tuning, preference optimization with refreshed rollouts, and multi-stage domain adaptation. Empirically, practitioners report that adapters trained in this regime plateau early and degrade silently; we argue the two observations share a common spectral cause.</p>
+            <p>Our analysis tracks the normalized singular values σ̃<sub>i</sub> = σ<sub>i</sub> / ‖ΔW‖<sub>F</sub> through training. When consecutive phases induce Hessians with misaligned top eigenspaces, gradient noise projected onto the shared subspace is amplified, whereas orthogonal components are damped at rate proportional to the mismatch κ. The resulting dynamics admit a closed-form fixed point at which all but O(1) directions vanish.</p>
+            <div class="eq" id="page-eq"></div>
+            <p>We make three contributions. First, we formalize spectral collapse and show it is distinct from rank deficiency at initialization. Second, we prove that the effective rank decays as exp(−κ t / τ) under a drift model with timescale τ. Third, we introduce a nuclear-norm penalty λ‖ΔW‖<sub>*</sub> that restores the spread of the spectrum at negligible cost, improving average accuracy by 3.1 points across benchmarks while matching the parameter budget of standard LoRA.</p>
+            <h2>2&nbsp;&nbsp;Preliminaries</h2>
+            <p>Let θ<sub>t</sub> denote the adapter parameters at step t and let 𝒟<sub>t</sub> be the data distribution of the active curriculum phase. We write H<sub>t</sub> = ∇²ℒ(θ<sub>t</sub>; 𝒟<sub>t</sub>) and assume ‖H<sub>t</sub> − H<sub>t′</sub>‖ ≤ L|t − t′| within a phase.</p>
+            <figure><svg viewBox="0 0 230 62">
+              <path d="M24 4v46h200" fill="none" stroke="#222" stroke-width=".7"/>
+              <path d="M24 10 C60 12 90 14 130 16 S200 18 222 18" fill="none" stroke="#1f5fbf" stroke-width="1.1"/>
+              <path d="M24 10 C50 14 70 30 100 40 S170 47 222 48" fill="none" stroke="#c0392b" stroke-width="1.1"/>
+              <path d="M24 10 C55 13 80 22 115 28 S190 32 222 33" fill="none" stroke="#e08e0b" stroke-width="1.1" stroke-dasharray="3 2"/>
+              <text x="8" y="30" font-size="5" transform="rotate(-90 8 30)" text-anchor="middle" font-family="Times New Roman">r<tspan font-size="3.5" dy="1">eff</tspan></text>
+              <text x="124" y="58" font-size="5" text-anchor="middle" font-family="Times New Roman">training step</text>
+            </svg><figcaption><b>Figure 1.</b> Effective rank of ΔW during training under a drifting curriculum. Standard LoRA (red) collapses after the second phase shift, while the nuclear-norm penalty (blue) preserves the spectrum.</figcaption></figure>
+          </div>
+        </div>
+
+        <div id="popup">
+          <div id="pop-head">
+            <svg viewBox="0 0 20 20" fill="none" stroke="#6e6e73" stroke-width="1.6"><path d="M3.5 10a6.5 6.5 0 1 0 2-4.7"/><path d="M3 3.5v3h3"/><path d="M10 6.5V10l2.5 1.6"/></svg>
+            <span id="model">gemini-4-argon</span>
+            <span class="sp"></span>
+            <svg viewBox="0 0 20 20" fill="none" stroke="#6e6e73" stroke-width="1.5"><rect x="6.5" y="6.5" width="10" height="11" rx="2"/><path d="M13.5 6.5V4.5a2 2 0 0 0-2-2h-6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h1"/></svg>
+            <svg viewBox="0 0 20 20" fill="none" stroke="#6e6e73" stroke-width="1.7"><path d="M5 5l10 10M15 5L5 15"/></svg>
+          </div>
+          <div id="pop-body">
+            <div class="bubble-row"><div class="bubble"><div class="txt" id="bubble-txt"></div><div class="more" id="bubble-more"></div></div></div>
+            <div id="thinking"><span class="dots"><i></i><i></i><i></i></span><span id="thinking-label"></span></div>
+            <div id="answer"></div>
+          </div>
+          <div id="pop-input"><span id="placeholder"></span></div>
+        </div>
+
+        <svg id="cursor" viewBox="0 0 11 16"><path d="M1 1 L1 13.2 L3.9 10.4 L5.9 15 L7.9 14.1 L5.9 9.6 L9.9 9.6 Z" fill="#000" stroke="#fff" stroke-width="1.1" stroke-linejoin="round"/></svg>
+      </div>
+    </div>
+    <div id="hinge"></div>
+
+    <div id="deck-wrap">
+      <div id="deck">
+        <div id="kb-well"></div>
+        <div id="keys"></div>
+        <div id="trackpad"></div>
+        <div id="deck-notch"></div>
+        <div id="deck-front"></div>
+        <svg id="hands" width="960" height="640" viewBox="0 0 960 640"></svg>
+      </div>
+    </div>
+  </div>
+
+  <div id="brand"><img src="../icon/AppIcon.png" alt=""><span>Nutshell</span></div>
+  <div id="hud"><div id="hud-inner"><span id="step"></span><span class="caps" id="hud-caps"></span><span id="hud-text"></span></div></div>
+</div>
+
+<script>
+(function () {
+  const LANG = new URLSearchParams(location.search).get('lang') === 'zh' ? 'zh' : 'en';
+
+  // ───────────────────────── 文案 ─────────────────────────
+  const TEXT = {
+    en: {
+      step0: 'Reading something dense?',
+      step1: 'Select all', step2: 'Copy', step3: 'Two-finger double-tap',
+      step4: 'Nutshell explains it in plain words',
+      thinking: 'gpt-5.4 is thinking…',
+      busy: 'Answering… you can start typing',
+      idle: 'Ask a follow-up… (Return to send, ⇧Return for newline)',
+      more: 'Show more ▾',
+      model: 'gpt-5.4',
+      tokens: 'gpt-5.4 · 3412 / 1M tokens',
+      menus: ['Preview', 'File', 'Edit', 'View', 'Go', 'Tools', 'Window', 'Help'],
+      clock: 'Sat 9:41 AM',
+      answer: `
+<p><b>In plain words:</b> when you fine-tune a big model by bolting on a small add-on (a “low-rank adapter”) and the training data keeps shifting, the add-on slowly stops learning new things. All its effort squeezes into one or two directions. The authors call this <b>spectral collapse</b>.</p>
+<p><b>Their fix:</b> a small penalty that keeps the effort spread out.</p>
+$$\\mathcal{L} = \\mathcal{L}_{\\text{task}} + \\lambda\\,\\lVert \\Delta W \\rVert_*$$
+<p><b>Why it matters:</b> if your fine-tune starts strong and then quietly gets worse, this is probably why.</p>`,
+    },
+    zh: {
+      step0: '论文看不懂？',
+      step1: '全选', step2: '复制', step3: '两指在触控板上连点两下',
+      step4: 'Nutshell 用大白话给你讲明白',
+      thinking: 'gpt-5.4 正在琢磨…',
+      busy: '正在回答…可以先打字',
+      idle: '接着问点什么…（回车发送，⇧回车换行）',
+      more: '展开全文 ▾',
+      model: 'gpt-5.4',
+      tokens: 'gpt-5.4 · 3412 / 100万 token',
+      menus: ['预览', '文件', '编辑', '显示', '前往', '工具', '窗口', '帮助'],
+      clock: '11月21日 周六 上午9:41',
+      answer: `
+<p><b>说人话：</b>给大模型外挂一个小插件（叫"低秩适配器"）来微调，如果训练数据一直在变，这个小插件就会慢慢学不进新东西，力气全挤到一两个方向上。作者管这叫<b>谱塌缩</b>。</p>
+<p><b>他们的办法：</b>加一个小惩罚，逼它把力气摊开。</p>
+$$\\mathcal{L} = \\mathcal{L}_{\\text{task}} + \\lambda\\,\\lVert \\Delta W \\rVert_*$$
+<p><b>跟你有啥关系：</b>微调头几天看着挺好，后面悄悄变差，原因多半就在这儿。</p>`,
+    },
+  }[LANG];
+
+  // ───────────────────────── 时间线（秒）─────────────────────────
+  // 首尾必须是同一个画面（全景、没选区、没浮窗），GIF 循环才接得上
+  const DURATION = 12.8;
+  const T = {
+    cmdA: [1.15, 1.5],       // ⌘A 按下到松开
+    select: 1.25,            // 选区出现
+    moveToC: [1.8, 2.05],    // 中指从 D 挪到 C
+    cmdC: [2.25, 2.6],
+    moveBack: [2.75, 3.0],
+    taps: [3.4, 3.62],       // 两指连点两下
+    popIn: 3.85,
+    zoom: [3.9, 5.0],
+    think: [3.85, 5.0],
+    stream: [5.0, 8.6],
+    close: [11.0, 11.18],    // 收尾分三拍：先关窗，
+    unselect: [11.1, 11.3],  // 再取消选区，
+    outro: [11.25, 12.35],   // 最后拉回全景
+  };
+
+  // ───────────────────────── 小工具 ─────────────────────────
+  const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+  const lerp = (a, b, k) => a + (b - a) * k;
+  const prog = (t, a, b) => clamp((t - a) / (b - a));
+  const ease = k => k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+  const easeOut = k => 1 - Math.pow(1 - k, 3);
+  const backOut = k => { const c = 1.5; return 1 + (c + 1) * Math.pow(k - 1, 3) + c * Math.pow(k - 1, 2); };
+  const pulse = (t, a, b, edge = .08) => Math.min(prog(t, a, a + edge), 1 - prog(t, b - edge, b));  // 按下 0→1，松开 1→0
+  const $ = id => document.getElementById(id);
+
+  // ───────────────────────── 键盘 ─────────────────────────
+  // 坐标都在「键盘面」自己的平面里，3D 斜放交给 CSS
+  const U = 880 / 14.5, GAP = 6, KX = 40, KH = 54;
+  const ROWS = [
+    { y: 24, h: 30, keys: [['esc', 1.5, 'fn'], ...Array.from({ length: 12 }, (_, i) => ['F' + (i + 1), 1, 'fn']), ['', 1, 'fn']] },
+    { y: 64, keys: [['`', 1], ...'1234567890'.split('').map(c => [c, 1]), ['-', 1], ['=', 1], ['delete', 1.5, 'small']] },
+    { y: 124, keys: [['tab', 1.5, 'small'], ...'QWERTYUIOP'.split('').map(c => [c, 1]), ['[', 1], [']', 1], ['\\', 1]] },
+    { y: 184, keys: [['caps lock', 1.8, 'small'], ...'ASDFGHJKL'.split('').map(c => [c, 1]), [';', 1], ["'", 1], ['return', 1.7, 'small']] },
+    { y: 244, keys: [['shift', 2.3, 'small'], ...'ZXCVBNM'.split('').map(c => [c, 1]), [',', 1], ['.', 1], ['/', 1], ['shift', 2.2, 'small']] },
+    { y: 304, keys: [['fn', 1, 'small'], ['control', 1, 'small'], ['option', 1, 'small'], ['⌘', 1.3, 'cmdL'], ['', 4.9], ['⌘', 1.3], ['option', 1, 'small'], ['◀', 1, 'fn'], ['▲▼', 1, 'fn'], ['▶', 1, 'fn']] },
+  ];
+  const KEY = {};   // 名字 → { el, cx, cy }
+  const keysEl = $('keys');
+  ROWS.forEach(row => {
+    let x = KX;
+    row.keys.forEach(([label, w, cls]) => {
+      const el = document.createElement('div');
+      el.className = 'key' + (cls && cls !== 'cmdL' ? ' ' + cls : '');
+      const h = row.h || KH;
+      Object.assign(el.style, { left: x + 'px', top: row.y + 'px', width: (w * U - GAP) + 'px', height: h + 'px' });
+      el.textContent = label;
+      keysEl.appendChild(el);
+      const info = { el, cx: x + (w * U - GAP) / 2, cy: row.y + h / 2 };
+      if (cls === 'cmdL') KEY.CMD = info;
+      else if (label.length === 1 && !KEY[label]) KEY[label] = info;
+      x += w * U;
+    });
+  });
+
+  function pressKey(info, amount) {
+    const el = info.el;
+    if (amount <= 0.001) { el.style.transform = ''; el.style.background = ''; el.style.boxShadow = ''; return; }
+    el.style.transform = `translateZ(${-3 * amount}px)`;
+    el.style.background = `linear-gradient(180deg, rgb(${42 + 30 * amount},${42 + 22 * amount},${45 + 8 * amount}), #1c1c1e)`;
+    el.style.boxShadow = `0 0 0 ${3 * amount}px rgba(255,166,64,${.95 * amount}), 0 0 ${26 * amount}px ${6 * amount}px rgba(255,150,40,${.55 * amount})`;
+  }
+
+  // ───────────────────────── 手 ─────────────────────────
+  // 扁平插画风的手：每根手指是一条带弯度、粗细渐变的整体轮廓，手背、手指、拇指用同一种肤色，
+  // 合在一起再套一层「边缘压暗、左上提亮」的滤镜，看着有体积但不脏。坐标都在键盘面的平面里。
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const hands = $('hands');
+  hands.innerHTML = `
+    <defs>
+      <filter id="handShadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="14" stdDeviation="11" flood-color="#5b3a26" flood-opacity=".26"/></filter>
+      <filter id="skinVol" x="-8%" y="-8%" width="116%" height="116%">
+        <feGaussianBlur in="SourceAlpha" stdDeviation="7" result="b"/>
+        <feOffset in="b" dx="-5" dy="-6" result="bLo"/>
+        <feComposite in="SourceAlpha" in2="bLo" operator="arithmetic" k2="1" k3="-1" result="rimLo"/>
+        <feFlood flood-color="#b9724c" flood-opacity=".62"/>
+        <feComposite in2="rimLo" operator="in" result="shade"/>
+        <feOffset in="b" dx="5" dy="6" result="bHi"/>
+        <feComposite in="SourceAlpha" in2="bHi" operator="arithmetic" k2="1" k3="-1" result="rimHi"/>
+        <feFlood flood-color="#fff4ea" flood-opacity=".4"/>
+        <feComposite in2="rimHi" operator="in" result="hi"/>
+        <feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="shade"/><feMergeNode in="hi"/></feMerge>
+      </filter>
+      <filter id="soft" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="4"/></filter>
+      <filter id="softer" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="16"/></filter>
+    </defs>
+    <g id="ripples"></g>
+    <g id="handL" filter="url(#handShadow)"></g>
+    <g id="handR" filter="url(#handShadow)"></g>
+    <g id="keyRipples"></g>`;
+
+  const sub = (a, b) => [a[0] - b[0], a[1] - b[1]];
+  const add = (a, b) => [a[0] + b[0], a[1] + b[1]];
+  const mul = (a, k) => [a[0] * k, a[1] * k];
+  const norm = a => { const l = Math.hypot(a[0], a[1]) || 1; return [a[0] / l, a[1] / l]; };
+  const P = p => p[0].toFixed(1) + ' ' + p[1].toFixed(1);
+  let skinFill = 'url(#skinGradL)';
+  const SKIN = { line: 'rgba(170,98,62,.30)', crease: 'rgba(170,98,62,.22)', nail: '#fbe5da', nailEdge: 'rgba(205,140,112,.45)' };
+
+  // 平滑闭合曲线（Catmull-Rom 转贝塞尔）
+  function blob(pts) {
+    let d = `M${P(pts[0])}`;
+    for (let i = 0; i < pts.length; i++) {
+      const p0 = pts[(i - 1 + pts.length) % pts.length], p1 = pts[i], p2 = pts[(i + 1) % pts.length], p3 = pts[(i + 2) % pts.length];
+      const c1 = add(p1, mul(sub(p2, p0), 1 / 6)), c2 = sub(p2, mul(sub(p3, p1), 1 / 6));
+      d += ` C${P(c1)} ${P(c2)} ${P(p2)}`;
+    }
+    return d + 'Z';
+  }
+
+  // 手的局部坐标系：x 朝右、y 朝指尖。deg 是整只手顺时针转了多少度
+  function frame(o, deg) {
+    const a = deg * Math.PI / 180, f = [Math.sin(a), -Math.cos(a)], r = [Math.cos(a), Math.sin(a)];
+    const at = (x, y) => [o[0] + r[0] * x + f[0] * y, o[1] + r[1] * x + f[1] * y];
+    at.f = f; at.r = r;
+    return at;
+  }
+
+  // 一根手指：中线是一条二次贝塞尔（bend 控制往哪边弯、弯多少），根部粗、尖部细，指节处略鼓，指尖是圆头。
+  // curl 表示这根手指蜷着：看起来更短、更圆，指甲朝下看不见，只留一道弯折的纹
+  function finger(base, tip, wb, wt, o = {}) {
+    const { bend = 0, press = 0, curl = 0, nail = true } = o;
+    const len = Math.hypot(...sub(tip, base));
+    const d = norm(sub(tip, base)), n = [-d[1], d[0]];
+    const ctrl = add(mul(add(base, tip), .5), mul(n, bend * len));
+    const at = s => add(add(mul(base, (1 - s) * (1 - s)), mul(ctrl, 2 * s * (1 - s))), mul(tip, s * s));
+    const tan = s => norm(add(mul(sub(ctrl, base), 2 * (1 - s)), mul(sub(tip, ctrl), 2 * s)));
+    const wTip = wt * (1 + .05 * press + .1 * curl);
+    const width = s => lerp(wb, wTip, Math.pow(s, .85)) * (1 + .05 * Math.exp(-(((s - .5) / .1) ** 2)) - .03 * Math.exp(-(((s - .7) / .07) ** 2)));
+    const L = [], R = [], N = 14;
+    for (let i = 0; i <= N; i++) {
+      const s = i / N, tg = tan(s), nn = [-tg[1], tg[0]], w = width(s) / 2, p = at(s);
+      L.push(add(p, mul(nn, w))); R.push(sub(p, mul(nn, w)));
+    }
+    const te = tan(1), ne = [-te[1], te[0]], r = wTip / 2, cap = [];
+    for (let k = 1; k < 8; k++) { const a = Math.PI * k / 8; cap.push(add(tip, add(mul(ne, r * Math.cos(a)), mul(te, r * Math.sin(a) * (1 - .15 * curl))))); }
+    let s = `<path d="${blob([...L, ...cap, ...R.reverse()])}" fill="${skinFill}" stroke="${SKIN.line}" stroke-width="1.2" stroke-linejoin="round"/>`;
+    // 中间关节一道很淡的纹
+    const j = curl > .3 ? .62 : .52, pj = at(j), tj = tan(j), nj = [-tj[1], tj[0]], wj = width(j) * .26;
+    s += `<path d="M${P(add(pj, mul(nj, wj)))} Q${P(add(pj, mul(tj, curl > .3 ? 4 : -3)))} ${P(sub(pj, mul(nj, wj)))}" fill="none" stroke="${SKIN.crease}" stroke-width="1.2" stroke-linecap="round"/>`;
+    // 顺着手指一道柔光
+    s += `<path d="M${P(add(at(.18), mul([-tan(.18)[1], tan(.18)[0]], -wb * .12)))} L${P(add(at(.82), mul([-tan(.82)[1], tan(.82)[0]], -wt * .12)))}" stroke="#fff7ef" stroke-width="${(wt * .3).toFixed(1)}" stroke-linecap="round" opacity=".28" filter="url(#soft)"/>`;
+    if (nail && curl < .5) {
+      const c = sub(tip, mul(te, r * .05)), ang = Math.atan2(te[1], te[0]) * 180 / Math.PI;
+      s += `<rect x="${(c[0] - r * .62).toFixed(1)}" y="${(c[1] - r * .5).toFixed(1)}" width="${(r * 1.24).toFixed(1)}" height="${(r * 1.0).toFixed(1)}" rx="${(r * .48).toFixed(1)}" transform="rotate(${(ang + 90).toFixed(1)} ${c[0].toFixed(1)} ${c[1].toFixed(1)})" fill="${press > .3 ? '#fff1ea' : SKIN.nail}" stroke="${SKIN.nailEdge}" stroke-width=".8" opacity=".9"/>`;
+    }
+    return s;
+  }
+
+  // 手背轮廓（局部坐标，左手）。右手镜像 x 取反
+  const PALM = [
+    [104, -4], [82, 9], [26, 14], [-32, 12], [-90, 0], [-110, -16],
+    [-115, -62], [-107, -120], [-92, -176], [-76, -222], [-60, -262],
+    [56, -262], [70, -222], [88, -176], [106, -130], [113, -80], [110, -34],
+  ];
+  // 袖口：一圈罗纹，往后接一截毛衣袖子，袖子往外慢慢淡掉，不拖一大块深色
+  function cuff(F, mirror) {
+    const m = mirror ? -1 : 1, W = (x, y) => F(m * x, y);
+    const band = blob([[-80, -226], [-28, -218], [28, -218], [80, -226], [85, -262], [87, -298], [-87, -298], [-85, -262]].map(p => W(...p)));
+    const body = blob([[-87, -290], [87, -290], [95, -350], [102, -440], [-102, -440], [-95, -350]].map(p => W(...p)));
+    const g0 = W(0, -290), g1 = W(0, -440), id = mirror ? 'sleeveFadeR' : 'sleeveFadeL';
+    let s = `<linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="${g0[0]}" y1="${g0[1]}" x2="${g1[0]}" y2="${g1[1]}"><stop offset="0" stop-color="#9aa7b8"/><stop offset=".45" stop-color="#9aa7b8" stop-opacity=".7"/><stop offset="1" stop-color="#9aa7b8" stop-opacity="0"/></linearGradient>`;
+    s += `<path d="${body}" fill="url(#${id})"/>`;
+    s += `<path d="${band}" fill="#b0bbca"/>`;
+    for (let x = -72; x <= 72; x += 9) {
+      const a = W(x, -226 + Math.abs(x) * .1), b = W(x * 1.06, -298);
+      s += `<path d="M${P(a)} L${P(b)}" stroke="rgba(52,66,88,.2)" stroke-width="2.2" stroke-linecap="round"/>`;
+    }
+    const e0 = W(-80, -226), e1 = W(0, -216), e2 = W(80, -226);
+    s += `<path d="M${P(e0)} Q${P(e1)} ${P(e2)}" stroke="rgba(255,255,255,.45)" stroke-width="2" fill="none" stroke-linecap="round"/>`;
+    return s;
+  }
+  // 肤色：靠指节的地方亮，往手腕慢慢加深
+  function skinGrad(id, F) {
+    const a = F(0, 0), b = F(0, -240);
+    return `<linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="${a[0].toFixed(1)}" y1="${a[1].toFixed(1)}" x2="${b[0].toFixed(1)}" y2="${b[1].toFixed(1)}"><stop offset="0" stop-color="#f6cdae"/><stop offset=".6" stop-color="#efbd9a"/><stop offset="1" stop-color="#e3a985"/></linearGradient>`;
+  }
+  function backOfHand(F, mirror) {
+    const m = mirror ? -1 : 1;
+    let s = `<path d="${blob(PALM.map(([x, y]) => F(m * x, y)))}" fill="${skinFill}"/>`;
+    // 手背上一片柔和的高光，和几道若有若无的筋
+    const h = F(m * -10, -70);
+    s += `<ellipse cx="${h[0].toFixed(1)}" cy="${h[1].toFixed(1)}" rx="70" ry="86" fill="#fff6ee" opacity=".12" filter="url(#softer)"/>`;
+    [[-58, -30, -40, -150], [0, -22, 4, -160], [56, -28, 40, -150]].forEach(([x0, y0, x1, y1]) => {
+      const a = F(m * x0, y0), c = F(m * (x0 + x1) / 2, (y0 + y1) / 2 + 6), b = F(m * x1, y1);
+      s += `<path d="M${P(a)} Q${P(c)} ${P(b)}" stroke="rgba(190,120,84,.08)" stroke-width="6" fill="none" stroke-linecap="round" filter="url(#softer)"/>`;
+    });
+    return s;
+  }
+
+  // 左手：小指够 A，大拇指收在手掌底下按左边的 ⌘，中指在 ⌘C 时从 D 挪到 C
+  function drawLeftHand(t) {
+    const pA = pulse(t, ...T.cmdA), pC = pulse(t, ...T.cmdC);
+    const toC = ease(prog(t, ...T.moveToC)) * (1 - ease(prog(t, ...T.moveBack)));
+    const push = -4 * Math.max(pA, pC);   // 按键时整只手微微往前压
+    const F = frame([270 + 4 * toC, 362 + push + 10 * toC], 4 + 3 * toC);
+    const kn = { pinky: F(-90, -14), ring: F(-32, -4), middle: F(26, -2), index: F(84, -10) };
+    const tips = {
+      pinky: [KEY.A.cx - 2, KEY.A.cy + 4],
+      ring: [KEY.S.cx - 9, KEY.S.cy - 1],
+      middle: [lerp(KEY.D.cx + 4, KEY.C.cx - 2, toC), lerp(KEY.D.cy - 4, KEY.C.cy - 2, toC)],
+      index: [KEY.F.cx + 4, KEY.F.cy + 6],
+      thumb: [KEY.CMD.cx + 12, KEY.CMD.cy + 12],
+    };
+    skinFill = 'url(#skinGradL)';
+    let s = `<g filter="url(#skinVol)">` + skinGrad('skinGradL', F);
+    // 大拇指收在手掌底下去够 ⌘：从虎口那儿鼓出一点，指尖藏在无名指和中指的指根底下
+    s += finger(F(76, -126), tips.thumb, 56, 40, { bend: .08, press: pA + pC, nail: false });
+    s += finger(kn.pinky, tips.pinky, 40, 32, { bend: .05, press: pA });
+    s += finger(kn.ring, tips.ring, 47, 38, { bend: .03 });
+    s += finger(kn.middle, tips.middle, 49, 39, { bend: -.02, press: pC, curl: .2 + .5 * toC });
+    s += finger(kn.index, tips.index, 48, 38, { bend: -.05 });
+    s += backOfHand(F, false) + `</g>`;
+    s += cuff(F, false);
+    $('handL').innerHTML = s;
+  }
+
+  // 右手搭在触控板上：食指中指点板，无名指小指放松地蜷着，大拇指搭在板的左下
+  function drawRightHand(t) {
+    const off = [0, 0];   // 右手一直搭在原位：首尾画面一样，循环才接得上
+    const tap = Math.max(pulse(t, T.taps[0], T.taps[0] + .13, .04), pulse(t, T.taps[1], T.taps[1] + .13, .04));
+    const sh = p => add(p, off);
+    const F0 = frame([628, 590], -12), F = (x, y) => sh(F0(x, y));
+    const tips = { index: sh([520, 468]), middle: sh([576, 456]) };
+    skinFill = 'url(#skinGradR)';
+    let s = `<g filter="url(#skinVol)">` + skinGrad('skinGradR', F);
+    s += finger(F(-92, -150), F(-150, -40), 62, 44, { bend: .14 });
+    s += finger(F(90, -14), F(72, 50), 40, 36, { bend: .06, curl: 1 });
+    s += finger(F(32, -4), F(22, 72), 47, 41, { bend: .04, curl: 1 });
+    s += finger(F(-26, -2), tips.middle, 49, 39 * (1 - .04 * tap), { bend: .03, press: tap });
+    s += finger(F(-84, -10), tips.index, 48, 38 * (1 - .04 * tap), { bend: .05, press: tap });
+    s += backOfHand(F, true) + `</g>`;
+    s += cuff(F, true);
+    $('handR').innerHTML = s;
+
+    // 两指每点一下，各自冒一圈涟漪
+    let r = '';
+    T.taps.forEach(t0 => {
+      const k = prog(t, t0, t0 + .55);
+      if (k > 0 && k < 1) {
+        [tips.index, tips.middle].forEach(p => {
+          r += `<circle cx="${p[0]}" cy="${p[1] - 8}" r="${(16 + 46 * easeOut(k)).toFixed(1)}" fill="none" stroke="rgba(255,150,40,${(.9 * (1 - k)).toFixed(2)})" stroke-width="${(5 * (1 - k) + 1).toFixed(1)}"/>`;
+        });
+      }
+    });
+    $('ripples').innerHTML = r;
+    return off;
+  }
+
+  // ───────────────────────── 屏幕上的公式和气泡 ─────────────────────────
+  try {
+    katex.render('\\tilde\\sigma_i(t+1) = \\tilde\\sigma_i(t)\\,\\bigl(1 - \\eta\\,\\kappa_t\\,\\langle u_i, v_t\\rangle^2\\bigr) + \\xi_t', $('page-eq'), { displayMode: false, throwOnError: false });
+  } catch (e) {}
+  // ⌘A 复制到的是整页：标题、作者、摘要……气泡里显示开头几行
+  const page = $('page');
+  $('bubble-txt').textContent = [page.querySelector('h1').textContent.replace(/Adapters/, 'Adapters '), page.querySelector('.authors').textContent,
+    page.querySelector('.abs').textContent].join('\n');
+  // 选区贴着每一行走（像真的文字选区），所以给每段正文里面包一层行内的 span
+  page.querySelectorAll('h1, .authors, p, h2, .eq, figcaption').forEach(el => { el.innerHTML = `<span class="sel">${el.innerHTML}</span>`; });
+  $('menus').innerHTML = TEXT.menus.map((m, i) => i ? `<span>${m}</span>` : `<b>${m}</b>`).join('');
+  $('menus').style.cssText = 'display:flex;gap:9px';
+  $('clock').textContent = TEXT.clock;
+  if (LANG === 'zh') $('pageinfo').textContent = '第 1 页，共 23 页';
+  $('bubble-more').textContent = TEXT.more;
+  $('thinking-label').textContent = TEXT.thinking;
+
+  // 回答先整段排好（公式交给 KaTeX），流式时再按字数截出前面一截
+  const full = document.createElement('div');
+  full.innerHTML = TEXT.answer.replace(/\$\$([\s\S]+?)\$\$/g, (_, tex) => katex.renderToString(tex, { displayMode: true, throwOnError: false }));
+  function units(node) {
+    if (node.nodeType === 3) return node.textContent.length;
+    if (node.classList && (node.classList.contains('katex-display') || node.classList.contains('katex'))) return 14;
+    let n = 0; node.childNodes.forEach(c => n += units(c)); return n;
+  }
+  const TOTAL = units(full);
+  function reveal(n) {
+    const out = full.cloneNode(true);
+    let left = n;
+    (function walk(node) {
+      [...node.childNodes].forEach(c => {
+        if (left <= 0) { c.remove(); return; }
+        if (c.nodeType === 3) {
+          if (c.textContent.length > left) c.textContent = c.textContent.slice(0, left);
+          left -= c.textContent.length;
+        } else if (c.classList && (c.classList.contains('katex-display') || c.classList.contains('katex'))) {
+          if (left < 14) c.remove(); left -= 14;
+        } else walk(c);
+      });
+    })(out);
+    [...out.querySelectorAll('p')].forEach(p => { if (!p.textContent.trim() && !p.querySelector('.katex')) p.remove(); });
+    return out;
+  }
+  let lastShown = -1;
+
+  // ───────────────────────── 画某一刻 ─────────────────────────
+  const DISPLAY = { x: 272, y: 36 };          // 屏幕显示区在画布上的位置
+  const CURSOR = [150, 50];                    // 指针停在页面左边的空白处
+  const POPUP = [CURSOR[0] + 16, CURSOR[1] + 16];   // 跟真实 app 一样，浮窗贴在指针右下方 16 点
+
+  // CSS 那种 cubic-bezier 缓动，推镜头用 (.5, 0, .15, 1)：起步干脆、落点稳
+  function bezier(x1, y1, x2, y2) {
+    const f = (a, b, k) => 3 * a * k * (1 - k) * (1 - k) + 3 * b * k * k * (1 - k) + k * k * k;
+    return x => { let lo = 0, hi = 1; for (let i = 0; i < 30; i++) { const m = (lo + hi) / 2; (f(x1, x2, m) < x ? lo = m : hi = m); } return f(y1, y2, (lo + hi) / 2); };
+  }
+  const camEase = bezier(.5, 0, .15, 1);
+  const easeIn = k => k * k * k;
+
+  // 字幕条：从头到尾一直在，里面的内容交叉淡化，条的宽度平滑地变
+  const TAP_ICON = '<span class="tap"><svg width="34" height="34" viewBox="0 0 34 34"><circle cx="12" cy="17" r="5.5" fill="#fff"/><circle cx="23" cy="15" r="5.5" fill="#fff"/><circle cx="12" cy="17" r="10" fill="none" stroke="#ff9f43" stroke-width="2"/><circle cx="23" cy="15" r="10" fill="none" stroke="#ff9f43" stroke-width="2"/></svg></span><span style="font-size:15px;color:#ff9f43;font-weight:700">×2</span>';
+  const SEGS = [
+    { at: 0.1, step: '', caps: '', text: TEXT.step0 },
+    { at: 0.75, step: '1', caps: '<kbd>⌘</kbd><kbd>A</kbd>', text: TEXT.step1 },
+    { at: 1.85, step: '2', caps: '<kbd>⌘</kbd><kbd>C</kbd>', text: TEXT.step2 },
+    { at: 2.95, step: '3', caps: TAP_ICON, text: TEXT.step3 },
+    { at: 4.1, step: '', caps: '', text: TEXT.step4 },
+  ];
+  const HUD_END = 11.0;
+  const hud = $('hud');
+  function fillHud(seg) {
+    $('step').textContent = seg.step ? (LANG === 'zh' ? '第 ' + seg.step + ' 步' : 'STEP ' + seg.step) : '';
+    $('step').style.display = seg.step ? '' : 'none';
+    $('hud-caps').innerHTML = seg.caps;
+    $('hud-caps').style.display = seg.caps ? '' : 'none';
+    $('hud-text').textContent = seg.text;
+  }
+  SEGS.forEach(seg => { fillHud(seg); seg.w = $('hud-inner').getBoundingClientRect().width + 40; });
+  let hudSeg = -1;
+
+  function renderAt(t) {
+    t = ((t % DURATION) + DURATION) % DURATION;
+
+    // 键：按下时发光，指尖处冒一圈涟漪（⌘ 被手掌盖着，靠字幕条说明）
+    Object.values(KEY).forEach(k => pressKey(k, 0));
+    const pA = pulse(t, ...T.cmdA), pC = pulse(t, ...T.cmdC);
+    if (pA > 0) { pressKey(KEY.CMD, pA); pressKey(KEY.A, pA); }
+    if (pC > 0) { pressKey(KEY.CMD, pC); pressKey(KEY.C, pC); }
+    let kr = '';
+    [[T.cmdA[0], KEY.A], [T.cmdC[0], KEY.C]].forEach(([t0, key]) => {
+      const k = prog(t, t0, t0 + .45);
+      if (k > 0 && k < 1) kr += `<circle cx="${key.cx}" cy="${key.cy}" r="${(10 + 24 * easeOut(k)).toFixed(1)}" fill="none" stroke="rgba(255,150,40,${(.95 * (1 - k)).toFixed(2)})" stroke-width="${(5 * (1 - k) + 1.5).toFixed(1)}"/>`;
+    });
+    $('keyRipples').innerHTML = kr;
+
+    drawLeftHand(t);
+    drawRightHand(t);
+
+    $('cursor').style.left = CURSOR[0] + 'px';
+    $('cursor').style.top = CURSOR[1] + 'px';
+
+    // 选区：⌘A 之后整页变蓝，收尾时像点了一下别处那样消失
+    const sel = easeOut(prog(t, T.select, T.select + .15)) * (1 - ease(prog(t, ...T.unselect)));
+    document.querySelectorAll('#page .sel').forEach(el => el.style.background = `rgba(128,176,255,${(.55 * sel).toFixed(3)})`);
+
+    // 浮窗：跟 macOS 的面板一样快速淡入，关的时候也干脆
+    const pin = easeOut(prog(t, T.popIn, T.popIn + .18));
+    const pout = easeIn(prog(t, ...T.close));
+    const pop = $('popup');
+    pop.style.left = POPUP[0] + 'px'; pop.style.top = POPUP[1] + 'px';
+    pop.style.opacity = (pin * (1 - pout)).toFixed(3);
+    pop.style.transform = `scale(${(lerp(.96, 1, pin) * lerp(1, .98, pout)).toFixed(4)})`;
+
+    const thinking = t >= T.think[0] && t < T.think[1];
+    $('thinking').style.display = thinking ? 'flex' : 'none';
+    [...document.querySelectorAll('#thinking .dots i')].forEach((d, i) => {
+      const ph = (t * 1.6 - i * .16) % 1;
+      const b = ph < .35 ? Math.sin(ph / .35 * Math.PI) : 0;
+      d.style.opacity = (.28 + .72 * b).toFixed(2);
+      d.style.transform = `translateY(${(-2.5 * b).toFixed(2)}px)`;
+    });
+    const sk = prog(t, ...T.stream);
+    const shown = t < T.stream[0] ? 0 : Math.min(TOTAL, Math.floor(sk * TOTAL / 5) * 5 + 5);
+    if (shown !== lastShown) {
+      const ans = $('answer');
+      ans.innerHTML = '';
+      if (shown > 0) {
+        const part = reveal(shown);
+        ans.append(...part.childNodes);
+      }
+      lastShown = shown;
+    }
+    const streaming = t >= T.stream[0] && sk < 1;
+    let caret = $('answer').querySelector('.caret');
+    if (streaming && !caret) {
+      const blocks = $('answer').querySelectorAll('p, .katex-display');
+      const last = blocks[blocks.length - 1];
+      if (last) { caret = document.createElement('span'); caret.className = 'caret'; last.appendChild(caret); }
+    }
+    if (caret) caret.style.opacity = streaming ? ((t * 2.2) % 1 < .5 ? .55 : 0) : 0;
+    $('placeholder').textContent = sk >= 1 ? TEXT.idle : TEXT.busy;
+    $('model').textContent = sk >= 1 ? TEXT.tokens : TEXT.model;
+
+    // 镜头。全景：整台电脑连同两只手，开头极慢地往前推一点，画面有呼吸感。
+    // 特写：屏幕正好铺满画面，像一段屏幕录像。收尾拉回到开头那个全景，首尾接得上
+    const zin = camEase(prog(t, ...T.zoom)), zout = ease(prog(t, ...T.outro));
+    const z = zin * (1 - zout);
+    const wideS = t < 6 ? lerp(.66, .69, prog(t, 0, T.zoom[0])) : .66;
+    const WIDE = { s: wideS, focus: [600, 500] };
+    // 浮窗居中、放大到 2 倍。看到的屏幕范围是显示区里 600×375 的一块，不会露出边框和背景
+    const CLOSE = { s: 2.0, focus: [DISPLAY.x + POPUP[0] + 165, DISPLAY.y + POPUP[1] + 145] };
+    const s = Math.exp(lerp(Math.log(WIDE.s), Math.log(CLOSE.s), z));
+    const focus = [lerp(WIDE.focus[0], CLOSE.focus[0], z), lerp(WIDE.focus[1], CLOSE.focus[1], z)];
+    const at = [600, lerp(372, 375, z)];
+    const tx = at[0] - s * focus[0], ty = at[1] - s * focus[1];
+    $('world').style.transform = `translate(${tx.toFixed(2)}px, ${ty.toFixed(2)}px) scale(${s.toFixed(4)})`;
+    $('brand').style.opacity = (1 - z).toFixed(3);
+
+    // 字幕条
+    let i = -1;
+    SEGS.forEach((seg, k) => { if (t >= seg.at) i = k; });
+    // 前几步字幕在底下；推近以后底下是浮窗，最后一句挪到顶上：先淡出、换位置、再淡入
+    const last = SEGS[SEGS.length - 1].at;
+    const dip = t < last ? 1 - prog(t, last - .15, last) : prog(t, last, last + .2);
+    hud.style.top = (t < last ? 656 : 24) + 'px';
+    const barA = Math.min(prog(t, .1, .3), 1 - prog(t, HUD_END - .2, HUD_END), dip);
+    if (i < 0 || barA <= 0) { hud.style.opacity = 0; return; }
+    if (i !== hudSeg) { fillHud(SEGS[i]); hudSeg = i; }
+    const seg = SEGS[i], next = SEGS[i + 1];
+    const inA = i === 0 ? 1 : prog(t, seg.at, seg.at + .15);
+    const outA = next && next.at !== last ? 1 - prog(t, next.at - .12, next.at) : 1;
+    $('hud-inner').style.opacity = Math.min(inA, outA).toFixed(3);
+    const prevW = i > 0 && seg.at !== last ? SEGS[i - 1].w : seg.w;
+    hud.style.width = lerp(prevW, seg.w, ease(prog(t, seg.at - .12, seg.at + .2))).toFixed(1) + 'px';
+    hud.style.opacity = barA.toFixed(3);
+    hud.style.transform = `translateX(-50%) translateY(${((1 - barA) * 8).toFixed(1)}px)`;
+  }
+
+  window.DURATION = DURATION;
+  window.renderAt = renderAt;
+
+  const fixed = new URLSearchParams(location.search).get('t');
+  if (fixed !== null) renderAt(parseFloat(fixed));
+  else if (!new URLSearchParams(location.search).has('capture')) {
+    const start = performance.now();
+    (function loop(now) { renderAt((now - start) / 1000); requestAnimationFrame(loop); })(start);
+  }
+})();
+</script>
+</body>
+</html>
